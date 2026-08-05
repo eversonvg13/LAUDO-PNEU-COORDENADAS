@@ -310,6 +310,9 @@ with st.container(border=True):
             except Exception as e:
                 st.error(f"Erro no processamento: {str(e)}")
 
+# Importe a função individual no topo do arquivo
+from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
+
 # ==============================================================================
 # EXIBIÇÃO DOS RESULTADOS (LAUDO CONSOLIDADO)
 # ==============================================================================
@@ -319,12 +322,12 @@ if st.session_state.get("inspection_results"):
     st.markdown("""
         <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 15px;'>
             <div style='background-color: #025ca3; color: white; font-weight: bold; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px;'>2</div>
-            <h3 style='margin: 0; padding: 0; font-size: 24px; color: #ffffff;'>Laudo Consolidado</h3>
+            <h3 style='margin: 0; padding: 0; font-size: 24px; color: #ffffff;'>Laudos dos Pneus</h3>
         </div>
     """, unsafe_allow_html=True)
 
     for res in st.session_state.inspection_results:
-        with st.expander(f"🛞 Laudo do Lote ({len(res['Imagens'])} fotos)", expanded=True):
+        with st.expander(f"🛞 Lote Processado ({len(res['Imagens'])} fotos)", expanded=True):
             st.markdown("##### Miniaturas Enviadas:")
             cols = st.columns(min(len(res["Imagens"]), 6))
             for idx, img_file in enumerate(res["Imagens"]):
@@ -334,49 +337,45 @@ if st.session_state.get("inspection_results"):
             st.markdown("---")
 
             if res["Pneus"]:
-                st.markdown("#### 🤖 Laudo por Pneu")
                 for i, pneu in enumerate(res["Pneus"], start=1):
-                    titulo = f"PNEU {i} — FOGO {pneu.get('fogo', 'N/A')}"
+                    fogo_num = pneu.get('fogo', f'N/A_{i}')
+                    titulo = f"PNEU {i} — FOGO {fogo_num}"
                     if pneu.get("fogo_localizado_na_planilha") is False:
                         titulo += " ⚠️ (não encontrado na planilha)"
+
                     with st.container(border=True):
-                        st.markdown(f"**{titulo}**")
+                        st.markdown(f"### 🛞 {titulo}")
                         c1, c2 = st.columns(2)
                         with c1:
                             st.write(f"**POS:** {pneu.get('pos', '')}")
-                            st.write(f"**VEICULO:** {pneu.get('veiculo', '')}")
+                            st.write(f"**VEÍCULO:** {pneu.get('veiculo', '')}")
                             st.write(f"**MEDIDA:** {pneu.get('medida', '')}")
                             st.write(f"**RETIRADA:** {pneu.get('retirada', '')}")
                         with c2:
-                            st.write(f"**LOCAL:** {pneu.get('local', '')}")
-                            st.write(f"**KM/POS:** {pneu.get('km_pos', '')}")
+                            st.write(f"**LOCAL/UNIDADE:** {pneu.get('local', '')}")
+                            st.write(f"**KM POS:** {pneu.get('km_pos', '')}")
                             st.write(f"**KM TOTAL:** {pneu.get('km_total', '')}")
-                            st.write(f"**Confiança:** {pneu.get('confianca', '')}")
-                        st.write(f"**Marca/Fabricante:** {pneu.get('marca', '')}")
-                        st.write(f"**Condição do Sulco:** {pneu.get('sulco', '')}")
-                        st.write(f"**Danos/Anomalias:** {pneu.get('danos', '')}")
+                            st.write(f"**Confiança IA:** {pneu.get('confianca', '')}")
+
+                        st.write(f"**Laudo / Dano Relatado:** {pneu.get('danos', '')}")
                         st.write(f"**Ação Recomendada:** {pneu.get('acao_recomendada', '')}")
 
-                pdf_bytes = gerar_pdf_laudo(res["Pneus"], res["Timestamp"])
-                st.download_button(
-                    label="📥 Baixar Laudo Técnico em PDF",
-                    data=pdf_bytes,
-                    file_name=f"laudo_pneus_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                    mime="application/pdf",
-                    type="primary",
-                )
+                        # Botão de download INDIVIDUAL para cada pneu
+                        pdf_pneu_bytes = gerar_pdf_laudo_pneu(pneu, res["Timestamp"].split()[0])
+                        st.download_button(
+                            label=f"📄 Baixar PDF - Pneu {fogo_num}",
+                            data=pdf_pneu_bytes,
+                            file_name=f"laudo_pneu_{fogo_num}.pdf",
+                            mime="application/pdf",
+                            key=f"btn_pdf_pneu_{fogo_num}_{i}"
+                        )
             else:
-                st.warning(
-                    "⚠️ A IA respondeu, mas não foi possível estruturar o resultado automaticamente "
-                    f"({res.get('Erro_Parse', 'motivo desconhecido')}). Veja a resposta bruta abaixo e, "
-                    "se necessário, baixe o laudo em formato simples."
-                )
-                st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=300)
+                st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
+                st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
                 pdf_fallback = gerar_pdf_fallback(res["Analise_IA_Bruta"], res["Timestamp"])
                 st.download_button(
-                    label="📥 Baixar Laudo (texto simples) em PDF",
+                    label="📥 Baixar Laudo Texto Simples",
                     data=pdf_fallback,
-                    file_name=f"laudo_pneus_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf",
-                    type="primary",
                 )
