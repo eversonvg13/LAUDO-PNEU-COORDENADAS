@@ -38,7 +38,6 @@ def encontrar_fvu_por_descricao(descricao_ia, fvu_data):
     
     desc_lower = descricao_ia.lower()
     
-    # 1. Tenta correspondência exata de palavras-chave significativas
     melhor_match = None
     max_pontos = 0
     
@@ -49,7 +48,6 @@ def encontrar_fvu_por_descricao(descricao_ia, fvu_data):
             max_pontos = pontos
             melhor_match = item
             
-    # Se encontrou relevância, retorna o item; senão, retorna o primeiro padrão
     return melhor_match if melhor_match and max_pontos > 0 else fvu_data[0]
 
 @st.cache_data(show_spinner=False)
@@ -233,16 +231,19 @@ with st.container(border=True):
                 fvu_data = carregar_tabela_fvu()
                 nome_modelo_ativo = obter_modelo_estavel(genai)
                 model = genai.GenerativeModel(nome_modelo_ativo)
+                
+                dict_fotos_enviadas = {f.name: f for f in uploaded_files}
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
                 prompt_instrucoes = f"""
                 Você é um inspetor técnico especialista em pneus de frotas pesadas.
-                Abaixo estão {len(sorted_files)} fotos ordenadas cronologicamente. Cada pneu começa com a foto do número de 'Fogo' escrito a giz.
+                Abaixo estão fotos enviadas. Agrupe as fotos de CADA pneu e analise.
 
                 Sua tarefa para cada pneu nas fotos:
-                1. Leia com precisão o número de Fogo escrito a giz.
-                2. Identifique a marca e estado geral do sulco.
-                3. Descreva detalhadamente o dano visual encontrado ou o estado de conservação (ex: desgaste irregular, corte no flanco, bolha, furo, rodagem normal, etc.).
+                1. Leia o número de Fogo escrito a giz.
+                2. Indique a lista EXATA de nomes dos arquivos de imagem que pertencem a este pneu na propriedade "arquivos_fotos".
+                3. Identifique a marca e estado geral do sulco.
+                4. Descreva detalhadamente o dano visual encontrado ou o estado de conservação.
 
                 Responda SOMENTE com um array JSON válido (um objeto por pneu):
                 [
@@ -250,7 +251,8 @@ with st.container(border=True):
                     "fogo": "string",
                     "marca": "string",
                     "sulco": "string",
-                    "descricao_dano_ia": "string (descreva livremente e com clareza o que você vê no pneu)",
+                    "arquivos_fotos": ["nome_arquivo1.jpg", "nome_arquivo2.jpg"],
+                    "descricao_dano_ia": "string",
                     "confianca": "Alta | Média | Baixa"
                   }}
                 ]
@@ -273,15 +275,6 @@ with st.container(border=True):
                     tabela_df = st.session_state.dados_relatorio
                     pneus_estruturados = []
                     
-                    # Converte as imagens enviadas para bytes para incluir no PDF
-                    imagens_bytes_list = []
-                    for img_file in sorted_files:
-                        try:
-                            img_file.seek(0)
-                            imagens_bytes_list.append(img_file.getvalue())
-                        except Exception:
-                            pass
-                    
                     for item in pneus_ia:
                         fogo_lido = str(item.get("fogo", "")).strip()
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
@@ -300,6 +293,23 @@ with st.container(border=True):
                             texto_causa = "-"
                             texto_acao = "Acompanhamento de rotina."
 
+                        # Extrai fotos pertencentes SOMENTE a este pneu
+                        fotos_pneu_nomes = item.get("arquivos_fotos", [])
+                        imagens_bytes_pneu = []
+                        for nome_f in fotos_pneu_nomes:
+                            if nome_f in dict_fotos_enviadas:
+                                try:
+                                    f_obj = dict_fotos_enviadas[nome_f]
+                                    f_obj.seek(0)
+                                    imagens_bytes_pneu.append(f_obj.getvalue())
+                                except Exception:
+                                    pass
+
+                        # Extração da quantidade de reformas ("Re") do relatório
+                        n_reformas = "0"
+                        if dados_tabela is not None:
+                            n_reformas = str(dados_tabela.get("Re", dados_tabela.get("REFORMAS", dados_tabela.get("RE", "0")))).strip()
+
                         pneu = {
                             "fogo": fogo_lido,
                             "pos": dados_tabela.get("POS", "") if dados_tabela else "",
@@ -309,6 +319,7 @@ with st.container(border=True):
                             "local": dados_tabela.get("LOCAL", "") if dados_tabela else "",
                             "km_pos": dados_tabela.get("KM/POS", "") if dados_tabela else "",
                             "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
+                            "n_reformas": n_reformas,
                             "marca": item.get("marca", ""),
                             "sulco": item.get("sulco", ""),
                             "codigo_fvu": codigo_fvu,
@@ -318,7 +329,7 @@ with st.container(border=True):
                             "acao_recomendada": texto_acao,
                             "confianca": item.get("confianca", ""),
                             "fogo_localizado_na_planilha": dados_tabela is not None,
-                            "imagens_bytes": imagens_bytes_list,
+                            "imagens_bytes": imagens_bytes_pneu,
                         }
                         pneus_estruturados.append(pneu)
                 except Exception as e:
@@ -406,6 +417,7 @@ if st.session_state.get("inspection_results"):
                             st.write(f"**VEÍCULO:** {pneu_exibicao.get('veiculo', '')}")
                             st.write(f"**MEDIDA:** {pneu_exibicao.get('medida', '')}")
                             st.write(f"**RETIRADA:** {pneu_exibicao.get('retirada', '')}")
+                            st.write(f"**Nº REFORMAS:** {pneu_exibicao.get('n_reformas', '0')}")
                         with c2:
                             st.write(f"**LOCAL/UNIDADE:** {pneu_exibicao.get('local', '')}")
                             st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
