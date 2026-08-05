@@ -206,7 +206,7 @@ if not st.session_state.dados_relatorio.empty:
 st.markdown("<br>", unsafe_allow_html=True)
 
 with st.container(border=True):
-    if st.button("⇧ Gerar Laudo", type="primary", use_container_width=True):
+    if st.button("📤 Gerar Laudo", type="primary", use_container_width=True):
         if not uploaded_files:
             st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
         elif not api_key:
