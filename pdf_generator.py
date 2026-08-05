@@ -110,7 +110,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'HeaderSub',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=12,  # <-- Altere aqui o tamanho do "Laudo de Pneus" livremente (ex: 12, 13, 14...)
+        fontSize=16,  # <-- Altere aqui o tamanho do "Laudo de Pneus" livremente (ex: 12, 13, 14...)
         leading=15,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
