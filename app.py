@@ -396,7 +396,7 @@ if st.session_state.get("inspection_results"):
 
             st.markdown("---")
 
-        if res["Pneus"]:
+if res["Pneus"]:
     fvu_options = st.session_state.get("fvu_data", [])
     
     for i, pneu in enumerate(res["Pneus"], start=1):
