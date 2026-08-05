@@ -15,7 +15,7 @@ from ai_helper import (
 from pdf_generator import gerar_pdf_laudo, gerar_pdf_fallback
 
 # ==============================================================================
-# CONFIGURAÇÃO DA PÁGINA (ÍCONE DA BÚSSOLA SOZINHA NA ABA)
+# CONFIGURAÇÃO DA PÁGINA
 # ==============================================================================
 favicon = "🧭"
 if os.path.exists("ssasdsds.png"):
@@ -32,7 +32,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# ESTILIZAÇÃO CSS (OCULTA BARRA LATERAL + TEMA ESCURO + BOTÃO VERMELHO)
+# ESTILIZAÇÃO CSS (TEMA ESCURO + LAYOUT DOS CARDS)
 # ==============================================================================
 st.markdown("""
     <style>
@@ -47,244 +47,276 @@ st.markdown("""
         color: #ffffff;
     }
 
-    /* Estilização do Botão Principal Vermelho */
-    div.stButton > button:first-child {
-        width: 100%;
-        border-radius: 8px;
-        font-weight: bold;
-        font-size: 16px;
-        background-color: #dc2626;
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        margin-top: 10px;
-        margin-bottom: 20px;
-    }
-    div.stButton > button:first-child:hover {
-        background-color: #b91c1c;
-        color: white;
-        border: none;
+    /* Remove padding superior padrão do Streamlit para o cabeçalho ficar colado no topo */
+    .block-container {
+        padding-top: 2rem !important;
     }
 
-    /* Ajuste de cores para títulos e divisores */
+    /* Customização dos contêineres (Cards) para o tema escuro */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #161b22;
+        border-radius: 10px;
+        border: 1px solid #30363d;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    }
+    
+    /* Estilo da área de arrastar e soltar (Uploader) */
+    [data-testid="stFileUploadDropzone"] {
+        background-color: #0d1117;
+        border: 1px dashed #4b5563;
+        border-radius: 8px;
+    }
+
+    /* Estilização do Botão Principal (Rosa/Vermelho claro do print) */
+    div.stButton > button:first-child {
+        width: 100%;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 16px;
+        background-color: #f07b82; /* Cor similar a da imagem */
+        color: white;
+        border: none;
+        padding: 10px;
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #dc2626;
+        color: white;
+    }
+
+    /* Esconder headers padrão para usar os customizados */
     .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         color: #ffffff !important;
-    }
-    hr {
-        border-color: #30363d;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# ==============================================================================
-# CABEÇALHO (LOGO BÚSSOLA SOZINHA + TÍTULO DA COORDENADAS)
-# ==============================================================================
-col_logo, col_titulo = st.columns([2, 8])
-
-with col_logo:
-    if os.path.exists("ssasdsds.png"):
-        st.image("ssasdsds.png", width=220)
-    elif os.path.exists("logo-nobg.png"):
-        st.image("logo-nobg.png", width=220)
-    else:
-        st.markdown("# 🧭")
-
-with col_titulo:
-    st.markdown("<h1 style='margin-bottom: 0px; margin-top: -5px;'>LAUDO PNEUS COORDENADAS</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #8b949e; font-size: 15px;'>Fluxo: 1) Envie o relatório HTML &nbsp;➔&nbsp; 2) Envie as fotos &nbsp;➔&nbsp; 3) Gere o laudo em PDF</p>", unsafe_allow_html=True)
-
 # Obtenção da chave de API em segundo plano (via Variável de Ambiente ou Secrets)
 api_key = os.environ.get("GEMINI_API_KEY", "") or st.secrets.get("GEMINI_API_KEY", "")
 
-st.markdown("---")
+# ==============================================================================
+# CABEÇALHO (LOGO + TÍTULO + LINHA VERMELHA)
+# ==============================================================================
+col_logo, col_titulo = st.columns([1, 11])
+
+with col_logo:
+    if os.path.exists("ssasdsds.png"):
+        st.image("ssasdsds.png", width=80)
+    elif os.path.exists("logo-nobg.png"):
+        st.image("logo-nobg.png", width=80)
+    else:
+        st.markdown("<h1 style='font-size: 50px; margin: 0; padding: 0;'>🧭</h1>", unsafe_allow_html=True)
+
+with col_titulo:
+    # Ajuste de margem para alinhar o texto verticalmente com a imagem
+    st.markdown("<h1 style='margin-top: 15px; font-weight: 900; font-size: 32px;'>LAUDO PNEUS COORDENADAS</h1>", unsafe_allow_html=True)
+
+# Linha vermelha forte dividindo o cabeçalho
+st.markdown('<hr style="border: none; height: 3px; background-color: #dc2626; margin-top: 15px; margin-bottom: 10px;">', unsafe_allow_html=True)
+
+# Texto de Fluxo Centralizado
+st.markdown("<p style='text-align: center; color: #a1a1aa; font-size: 16px; margin-bottom: 40px;'>Fluxo: <b>1)</b> Envie o relatório e as fotos &nbsp;➔&nbsp; <b>2)</b> Gere o laudo em PDF</p>", unsafe_allow_html=True)
 
 # ==============================================================================
-# SEÇÃO PRINCIPAL (PASSO 1 E PASSO 2 LADO A LADO EM COLUNAS)
+# SEÇÃO 1: RELATÓRIO E FOTOS (TÍTULO E CARDS)
 # ==============================================================================
+# Título com o quadrado azul do número 1
+st.markdown("""
+    <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 15px;'>
+        <div style='background-color: #025ca3; color: white; font-weight: bold; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px;'>1</div>
+        <h3 style='margin: 0; padding: 0; font-size: 24px;'>Relatório e Fotos</h3>
+    </div>
+""", unsafe_allow_html=True)
+
 col1, col2 = st.columns(2)
 
-# --- COLUNA 1: RELATÓRIO HTML ---
+# --- CARD 1: RELATÓRIO HTML ---
 with col1:
-    st.markdown("### 📄 1. Relatório de Troca (HTML)")
-    relatorio_file = st.file_uploader(
-        "Envie o relatório exportado em HTML",
-        type=["html", "htm"],
-        accept_multiple_files=False,
-        key="uploader_html"
-    )
+    with st.container(border=True):
+        st.markdown("<h4 style='color: #ef4444; margin-top: 0;'><span style='font-size: 18px;'>📄</span> Relatório HTML</h4>", unsafe_allow_html=True)
+        st.caption("Envie o relatório exportado em HTML (Relatório de Troca de Pneus - Modelo 4)")
+        
+        relatorio_file = st.file_uploader(
+            "Selecionar arquivo",
+            type=["html", "htm"],
+            accept_multiple_files=False,
+            key="uploader_html",
+            label_visibility="collapsed" # Esconde o label padrão para ficar limpo
+        )
 
-    if relatorio_file is not None:
-        if st.session_state.get("relatorio_nome_processado") != relatorio_file.name:
-            with st.spinner("Extraindo dados do relatório..."):
-                try:
-                    df_relatorio = parse_relatorio_html(relatorio_file.getvalue())
-                    st.session_state.dados_relatorio = df_relatorio
-                    st.session_state.relatorio_nome_processado = relatorio_file.name
-                except Exception as e:
-                    st.error(f"Não foi possível processar o relatório: {e}")
+        if relatorio_file is not None:
+            if st.session_state.get("relatorio_nome_processado") != relatorio_file.name:
+                with st.spinner("Extraindo dados..."):
+                    try:
+                        df_relatorio = parse_relatorio_html(relatorio_file.getvalue())
+                        st.session_state.dados_relatorio = df_relatorio
+                        st.session_state.relatorio_nome_processado = relatorio_file.name
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
 
-    if "dados_relatorio" not in st.session_state:
-        st.session_state.dados_relatorio = pd.DataFrame(columns=CAMPOS_FIXOS)
-
-    if not st.session_state.dados_relatorio.empty:
-        st.success(f"✅ {len(st.session_state.dados_relatorio)} pneus extraídos do relatório.")
-        with st.expander("📋 Ver / editar dados extraídos do relatório", expanded=False):
-            st.caption("Pode corrigir manualmente qualquer campo antes de gerar o laudo.")
-            st.session_state.dados_relatorio = st.data_editor(
-                st.session_state.dados_relatorio,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="editor_dados_relatorio",
-            )
-    else:
-        with st.expander("📋 Tabela de Dados Manual / Vazia", expanded=False):
-            st.caption("Nenhum relatório carregado ainda — envie o HTML acima ou preencha manualmente:")
-            st.session_state.dados_relatorio = st.data_editor(
-                st.session_state.dados_relatorio,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="editor_dados_relatorio_manual",
-            )
-
-# --- COLUNA 2: FOTOS DOS PNEUS ---
+# --- CARD 2: FOTOS DOS PNEUS ---
 with col2:
-    st.markdown("### 📷 2. Fotos dos Pneus")
-    uploaded_files = st.file_uploader(
-        "Envie o lote completo de fotos dos pneus",
-        type=["jpg", "jpeg", "png"],
-        accept_multiple_files=True,
-        key="uploader_fotos"
-    )
-
-    modo_analise = st.selectbox(
-        "Selecione o Modo de Análise",
-        [
-            "Inspeção Completa (ID Fogo + Sulco + Danos)",
-            "Apenas Extrair Número de 'Fogo' (ID do Pneu)",
-            "Análise Profunda de Danos e Desgaste de Banda"
-        ]
-    )
+    with st.container(border=True):
+        st.markdown("<h4 style='color: #ef4444; margin-top: 0;'><span style='font-size: 18px;'>🖼️</span> Fotos dos Pneus</h4>", unsafe_allow_html=True)
+        st.caption("Envie o lote completo de fotos dos pneus (JPG, PNG)")
+        
+        uploaded_files = st.file_uploader(
+            "Selecionar arquivos",
+            type=["jpg", "jpeg", "png"],
+            accept_multiple_files=True,
+            key="uploader_fotos",
+            label_visibility="collapsed"
+        )
+        
+        modo_analise = st.selectbox(
+            "Modo de Análise IA:",
+            [
+                "Inspeção Completa (ID Fogo + Sulco + Danos)",
+                "Apenas Extrair Número de 'Fogo' (ID do Pneu)",
+                "Análise Profunda de Danos e Desgaste de Banda"
+            ]
+        )
 
 # ==============================================================================
-# BOTÃO PRINCIPAL DE EXECUÇÃO
+# VISUALIZAÇÃO DOS DADOS DO RELATÓRIO (EXPANDER OPCIONAL)
+# ==============================================================================
+# Se a planilha foi lida, exibe fora dos cards para não quebrar o layout visual
+if "dados_relatorio" not in st.session_state:
+    st.session_state.dados_relatorio = pd.DataFrame(columns=CAMPOS_FIXOS)
+
+if not st.session_state.dados_relatorio.empty:
+    with st.expander(f"✅ {len(st.session_state.dados_relatorio)} pneus extraídos do relatório. Clique para ver/editar."):
+        st.session_state.dados_relatorio = st.data_editor(
+            st.session_state.dados_relatorio,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="editor_dados_relatorio",
+        )
+
+# ==============================================================================
+# SEÇÃO DO BOTÃO PRINCIPAL (CARD INFERIOR)
 # ==============================================================================
 st.markdown("<br>", unsafe_allow_html=True)
 
-if st.button("🚀 GERAR LAUDO EM PDF", type="primary"):
-    if not uploaded_files:
-        st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
-    elif not api_key:
-        st.error("⚠️ Chave de API do Gemini não configurada no servidor (GEMINI_API_KEY).")
-    else:
-        if "inspection_results" not in st.session_state:
-            st.session_state.inspection_results = []
+with st.container(border=True):
+    if st.button("⇧ Gerar Laudo", type="primary", use_container_width=True):
+        if not uploaded_files:
+            st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
+        elif not api_key:
+            st.error("⚠️ Chave de API do Gemini não configurada no servidor (GEMINI_API_KEY).")
+        else:
+            if "inspection_results" not in st.session_state:
+                st.session_state.inspection_results = []
 
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-
-            texto_status = st.empty()
-            texto_status.text("Selecionando modelo estável...")
-
-            nome_modelo_ativo = obter_modelo_estavel(genai)
-            texto_status.text(f"Conectado ao modelo: {nome_modelo_ativo}. Comprimindo lote de fotos...")
-
-            model = genai.GenerativeModel(nome_modelo_ativo)
-            sorted_files = sorted(uploaded_files, key=lambda f: f.name)
-
-            prompt_instrucoes = f"""
-            Você é um inspetor especialista em inventário de pneus de frota (SMART-LOG).
-            Abaixo estão {len(sorted_files)} fotos ordenadas cronologicamente.
-
-            Sua tarefa:
-            1. Analise todas as imagens e agrupe-as por pneu individual. Cada novo pneu começa com a
-               foto da lateral contendo o número de 'Fogo' (identificação pintada em giz/tinta, ex: 32813),
-               seguida das fotos de banda de rodagem/sulco/danos daquele pneu até a próxima foto de 'Fogo'.
-            2. Para cada pneu, leia o número de Fogo exatamente como aparece na foto (todos os dígitos,
-               incluindo zeros à esquerda se estiverem visíveis).
-            3. Modo de análise solicitado: {modo_analise}.
-
-            Responda SOMENTE com um array JSON válido (nada de texto antes ou depois, nada de markdown),
-            no seguinte formato exato, um objeto por pneu:
-
-            [
-              {{
-                "fogo": "string (número lido na foto)",
-                "marca": "string (observado na foto)",
-                "sulco": "string (observado na foto)",
-                "danos": "string (observado na foto)",
-                "acao_recomendada": "string",
-                "confianca": "Alta | Média | Baixa"
-              }}
-            ]
-
-            NÃO invente dados de placa, posição, quilometragem ou datas — essas informações não vêm
-            das fotos e serão preenchidas separadamente a partir do relatório da frota.
-            """
-
-            conteudo_requisicao = []
-            for f in sorted_files:
-                bytes_comprimidos = comprimir_imagem(f.getvalue())
-                conteudo_requisicao.append(f"Arquivo: {f.name}")
-                conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
-            conteudo_requisicao.append(prompt_instrucoes)
-
-            texto_status.text(f"Enviando dados para a IA ({nome_modelo_ativo})...")
-            resposta_ia = model.generate_content(conteudo_requisicao)
-
-            pneus_estruturados = None
-            erro_parse = None
             try:
-                pneus_ia = extrair_json_da_resposta(resposta_ia.text)
-                tabela_df = st.session_state.dados_relatorio
-                pneus_estruturados = []
-                for item in pneus_ia:
-                    fogo_lido = str(item.get("fogo", "")).strip()
-                    dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
+                import google.generativeai as genai
+                genai.configure(api_key=api_key)
 
-                    pneu = {
-                        "fogo": fogo_lido,
-                        "pos": dados_tabela.get("POS", "") if dados_tabela else "",
-                        "veiculo": dados_tabela.get("VEICULO", "") if dados_tabela else "",
-                        "medida": dados_tabela.get("MEDIDA", "") if dados_tabela else "",
-                        "retirada": dados_tabela.get("RETIRADA", "") if dados_tabela else "",
-                        "local": dados_tabela.get("LOCAL", "") if dados_tabela else "",
-                        "km_pos": dados_tabela.get("KM/POS", "") if dados_tabela else "",
-                        "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
-                        "marca": item.get("marca", ""),
-                        "sulco": item.get("sulco", ""),
-                        "danos": item.get("danos", ""),
-                        "acao_recomendada": item.get("acao_recomendada", ""),
-                        "confianca": item.get("confianca", ""),
-                        "fogo_localizado_na_planilha": dados_tabela is not None,
-                    }
-                    pneus_estruturados.append(pneu)
+                texto_status = st.empty()
+                texto_status.info("Selecionando modelo estável...")
+
+                nome_modelo_ativo = obter_modelo_estavel(genai)
+                texto_status.info(f"Conectado ao modelo: {nome_modelo_ativo}. Comprimindo lote de fotos...")
+
+                model = genai.GenerativeModel(nome_modelo_ativo)
+                sorted_files = sorted(uploaded_files, key=lambda f: f.name)
+
+                prompt_instrucoes = f"""
+                Você é um inspetor especialista em inventário de pneus de frota (SMART-LOG).
+                Abaixo estão {len(sorted_files)} fotos ordenadas cronologicamente.
+
+                Sua tarefa:
+                1. Analise todas as imagens e agrupe-as por pneu individual. Cada novo pneu começa com a
+                   foto da lateral contendo o número de 'Fogo' (identificação pintada em giz/tinta, ex: 32813),
+                   seguida das fotos de banda de rodagem/sulco/danos daquele pneu até a próxima foto de 'Fogo'.
+                2. Para cada pneu, leia o número de Fogo exatamente como aparece na foto.
+                3. Modo de análise solicitado: {modo_analise}.
+
+                Responda SOMENTE com um array JSON válido (nada de texto antes ou depois, nada de markdown),
+                no seguinte formato exato, um objeto por pneu:
+
+                [
+                  {{
+                    "fogo": "string (número lido na foto)",
+                    "marca": "string (observado na foto)",
+                    "sulco": "string (observado na foto)",
+                    "danos": "string (observado na foto)",
+                    "acao_recomendada": "string",
+                    "confianca": "Alta | Média | Baixa"
+                  }}
+                ]
+
+                NÃO invente dados de placa, posição, quilometragem ou datas.
+                """
+
+                conteudo_requisicao = []
+                for f in sorted_files:
+                    bytes_comprimidos = comprimir_imagem(f.getvalue())
+                    conteudo_requisicao.append(f"Arquivo: {f.name}")
+                    conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
+                conteudo_requisicao.append(prompt_instrucoes)
+
+                texto_status.info(f"Enviando dados para a IA ({nome_modelo_ativo})... aguarde, isso pode levar alguns minutos.")
+                resposta_ia = model.generate_content(conteudo_requisicao)
+
+                pneus_estruturados = None
+                erro_parse = None
+                try:
+                    pneus_ia = extrair_json_da_resposta(resposta_ia.text)
+                    tabela_df = st.session_state.dados_relatorio
+                    pneus_estruturados = []
+                    for item in pneus_ia:
+                        fogo_lido = str(item.get("fogo", "")).strip()
+                        dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
+
+                        pneu = {
+                            "fogo": fogo_lido,
+                            "pos": dados_tabela.get("POS", "") if dados_tabela else "",
+                            "veiculo": dados_tabela.get("VEICULO", "") if dados_tabela else "",
+                            "medida": dados_tabela.get("MEDIDA", "") if dados_tabela else "",
+                            "retirada": dados_tabela.get("RETIRADA", "") if dados_tabela else "",
+                            "local": dados_tabela.get("LOCAL", "") if dados_tabela else "",
+                            "km_pos": dados_tabela.get("KM/POS", "") if dados_tabela else "",
+                            "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
+                            "marca": item.get("marca", ""),
+                            "sulco": item.get("sulco", ""),
+                            "danos": item.get("danos", ""),
+                            "acao_recomendada": item.get("acao_recomendada", ""),
+                            "confianca": item.get("confianca", ""),
+                            "fogo_localizado_na_planilha": dados_tabela is not None,
+                        }
+                        pneus_estruturados.append(pneu)
+                except Exception as e:
+                    erro_parse = str(e)
+
+                st.session_state.inspection_results = [{
+                    "Timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "Modelo_Usado": nome_modelo_ativo,
+                    "Analise_IA_Bruta": resposta_ia.text,
+                    "Pneus": pneus_estruturados,
+                    "Erro_Parse": erro_parse,
+                    "Imagens": sorted_files
+                }]
+
+                texto_status.success(f"✅ Inspeção concluída com sucesso via {nome_modelo_ativo}!")
+
             except Exception as e:
-                erro_parse = str(e)
-
-            st.session_state.inspection_results = [{
-                "Timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                "Modelo_Usado": nome_modelo_ativo,
-                "Analise_IA_Bruta": resposta_ia.text,
-                "Pneus": pneus_estruturados,
-                "Erro_Parse": erro_parse,
-                "Imagens": sorted_files
-            }]
-
-            texto_status.success(f"✅ Inspeção concluída com sucesso via {nome_modelo_ativo}!")
-
-        except Exception as e:
-            st.error(f"Erro no processamento: {str(e)}")
+                st.error(f"Erro no processamento: {str(e)}")
 
 # ==============================================================================
 # EXIBIÇÃO DOS RESULTADOS (LAUDO CONSOLIDADO)
 # ==============================================================================
 if st.session_state.get("inspection_results"):
     st.markdown("---")
-    st.subheader("📊 Laudo Consolidado")
+    
+    st.markdown("""
+        <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 15px;'>
+            <div style='background-color: #025ca3; color: white; font-weight: bold; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px;'>2</div>
+            <h3 style='margin: 0; padding: 0; font-size: 24px;'>Laudo Consolidado</h3>
+        </div>
+    """, unsafe_allow_html=True)
 
     for res in st.session_state.inspection_results:
-        with st.expander(f"🛞 Laudo do Lote ({len(res['Imagens'])} fotos) - Modelo: {res.get('Modelo_Usado', 'gemini-flash-latest')}", expanded=True):
+        with st.expander(f"🛞 Laudo do Lote ({len(res['Imagens'])} fotos)", expanded=True):
             st.markdown("##### Miniaturas Enviadas:")
             cols = st.columns(min(len(res["Imagens"]), 6))
             for idx, img_file in enumerate(res["Imagens"]):
