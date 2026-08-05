@@ -13,7 +13,7 @@ from ai_helper import (
     buscar_dados_relatorio,
     extrair_json_da_resposta,
 )
-from pdf_generator import gerar_pdf_laudo, gerar_pdf_fallback
+from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
 
 # Função auxiliar para converter imagem em base64 (centralização perfeita via HTML)
 def get_image_base64(path):
