@@ -392,80 +392,80 @@ if st.session_state.get("inspection_results"):
             cols = st.columns(min(len(res["Imagens"]), 6))
             for idx, img_file in enumerate(res["Imagens"]):
                 with cols[idx % 6]:
-                    st.image(img_file, caption=img_file.name, use_container_width=True)
+                    st.image(img_file, caption=img_file.name, width=150)
 
             st.markdown("---")
 
-if res["Pneus"]:
-    fvu_options = st.session_state.get("fvu_data", [])
-    
-    for i, pneu in enumerate(res["Pneus"], start=1):
-        fogo_num = pneu.get('fogo', f'N/A_{i}')
-        titulo = f"PNEU {i} — FOGO {fogo_num}"
-        if pneu.get("fogo_localizado_na_planilha") is False:
-            titulo += " ⚠️ (não encontrado na planilha)"
-
-        with st.container(border=True):
-            st.markdown(f"### 🛞 {titulo}")
-            
-            # --- MENU DE CORREÇÃO DO FVU ---
-            if fvu_options:
-                current_code = pneu.get("codigo_fvu", "")
-                matching_index = 0
-                for idx, opt in enumerate(fvu_options):
-                    if opt['codigo'].lower() == current_code.lower():
-                        matching_index = idx
-                        break
+            if res["Pneus"]:
+                fvu_options = st.session_state.get("fvu_data", [])
                 
-                selected_fvu_label = st.selectbox(
-                    f"🔍 Classificação FVU (Ajustar se necessário - Pneu {fogo_num})",
-                    options=[f"{x['codigo']} - {x['descricao']}" for x in fvu_options],
-                    index=matching_index,
-                    key=f"select_fvu_{i}_{fogo_num}_{res['Timestamp']}"
+                for i, pneu in enumerate(res["Pneus"], start=1):
+                    fogo_num = pneu.get('fogo', f'N/A_{i}')
+                    titulo = f"PNEU {i} — FOGO {fogo_num}"
+                    if pneu.get("fogo_localizado_na_planilha") is False:
+                        titulo += " ⚠️ (não encontrado na planilha)"
+
+                    with st.container(border=True):
+                        st.markdown(f"### 🛞 {titulo}")
+                        
+                        # --- MENU DE CORREÇÃO DO FVU ---
+                        if fvu_options:
+                            current_code = pneu.get("codigo_fvu", "")
+                            matching_index = 0
+                            for idx, opt in enumerate(fvu_options):
+                                if opt['codigo'].lower() == current_code.lower():
+                                    matching_index = idx
+                                    break
+                            
+                            selected_fvu_label = st.selectbox(
+                                f"🔍 Classificação FVU (Ajustar se necessário - Pneu {fogo_num})",
+                                options=[f"{x['codigo']} - {x['descricao']}" for x in fvu_options],
+                                index=matching_index,
+                                key=f"select_fvu_{i}_{fogo_num}_{res['Timestamp']}"
+                            )
+                            
+                            novo_codigo = selected_fvu_label.split(" - ")[0]
+                            novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
+                            
+                            if novo_fvu_obj and novo_fvu_obj['codigo'] != current_code:
+                                pneu["codigo_fvu"] = novo_fvu_obj['codigo']
+                                pneu["danos"] = novo_fvu_obj['descricao']
+                                pneu["causas_provaveis"] = novo_fvu_obj['causa']
+                                pneu["observacoes"] = novo_fvu_obj['acao']
+                                pneu["acao_recomendada"] = novo_fvu_obj['acao']
+                                st.rerun()
+
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.write(f"**POS:** {pneu.get('pos', '')}")
+                            st.write(f"**VEÍCULO:** {pneu.get('veiculo', '')}")
+                            st.write(f"**MEDIDA:** {pneu.get('medida', '')}")
+                            st.write(f"**RETIRADA:** {pneu.get('retirada', '')}")
+                        with c2:
+                            st.write(f"**LOCAL/UNIDADE:** {pneu.get('local', '')}")
+                            st.write(f"**KM POS:** {pneu.get('km_pos', '')}")
+                            st.write(f"**KM TOTAL:** {pneu.get('km_total', '')}")
+                            st.write(f"**Confiança IA:** {pneu.get('confianca', '')}")
+
+                        st.write(f"**Laudo / Dano Relatado:** {pneu.get('danos', '')}")
+                        st.write(f"**Causas Prováveis:** {pneu.get('causas_provaveis', '')}")
+                        st.write(f"**Observações / Ação:** {pneu.get('observacoes', '')}")
+
+                        pdf_pneu_bytes = gerar_pdf_em_cache(pneu, res["Timestamp"].split()[0])
+                        st.download_button(
+                            label=f"📄 Baixar PDF - Pneu {fogo_num}",
+                            data=pdf_pneu_bytes,
+                            file_name=f"laudo_pneu_{fogo_num}.pdf",
+                            mime="application/pdf",
+                            key=f"btn_pdf_pneu_{fogo_num}_{i}_{res['Timestamp']}"
+                        )
+            else:
+                st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
+                st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
+                pdf_fallback = gerar_pdf_fallback(res["Analise_IA_Bruta"], res["Timestamp"])
+                st.download_button(
+                    label="📥 Baixar Laudo Texto Simples",
+                    data=pdf_fallback,
+                    file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
                 )
-                
-                novo_codigo = selected_fvu_label.split(" - ")[0]
-                novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
-                
-                if novo_fvu_obj and novo_fvu_obj['codigo'] != current_code:
-                    pneu["codigo_fvu"] = novo_fvu_obj['codigo']
-                    pneu["danos"] = novo_fvu_obj['descricao']
-                    pneu["causas_provaveis"] = novo_fvu_obj['causa']
-                    pneu["observacoes"] = novo_fvu_obj['acao']
-                    pneu["acao_recomendada"] = novo_fvu_obj['acao']
-                    st.rerun()
-
-            c1, c2 = st.columns(2)
-            with c1:
-                st.write(f"**POS:** {pneu.get('pos', '')}")
-                st.write(f"**VEÍCULO:** {pneu.get('veiculo', '')}")
-                st.write(f"**MEDIDA:** {pneu.get('medida', '')}")
-                st.write(f"**RETIRADA:** {pneu.get('retirada', '')}")
-            with c2:
-                st.write(f"**LOCAL/UNIDADE:** {pneu.get('local', '')}")
-                st.write(f"**KM POS:** {pneu.get('km_pos', '')}")
-                st.write(f"**KM TOTAL:** {pneu.get('km_total', '')}")
-                st.write(f"**Confiança IA:** {pneu.get('confianca', '')}")
-
-            st.write(f"**Laudo / Dano Relatado:** {pneu.get('danos', '')}")
-            st.write(f"**Causas Prováveis:** {pneu.get('causas_provaveis', '')}")
-            st.write(f"**Observações / Ação:** {pneu.get('observacoes', '')}")
-
-            pdf_pneu_bytes = gerar_pdf_em_cache(pneu, res["Timestamp"].split()[0])
-            st.download_button(
-                label=f"📄 Baixar PDF - Pneu {fogo_num}",
-                data=pdf_pneu_bytes,
-                file_name=f"laudo_pneu_{fogo_num}.pdf",
-                mime="application/pdf",
-                key=f"btn_pdf_pneu_{fogo_num}_{i}_{res['Timestamp']}"
-            )
-else:
-    st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
-    st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
-    pdf_fallback = gerar_pdf_fallback(res["Analise_IA_Bruta"], res["Timestamp"])
-    st.download_button(
-        label="📥 Baixar Laudo Texto Simples",
-        data=pdf_fallback,
-        file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-        mime="application/pdf",
-    )
