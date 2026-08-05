@@ -1,12 +1,11 @@
 streamlit
-pillow
-pytesseract
-opencv-python-headless
 numpy
-google-generativeai
 pandas
-httpx
+pillow
+opencv-python-headless
 beautifulsoup4
 fpdf2
-pillow
 reportlab
+httpx
+google-generativeai
+pytesseract
