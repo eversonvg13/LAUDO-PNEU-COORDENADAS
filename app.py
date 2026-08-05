@@ -32,6 +32,26 @@ def carregar_tabela_fvu():
 if "fvu_data" not in st.session_state:
     st.session_state.fvu_data = carregar_tabela_fvu()
 
+# Inicializa o gerenciamento de múltiplas chaves de API na sessão
+if "lista_chaves" not in st.session_state:
+    chaves = []
+    # Captura a chave principal
+    if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+        chaves.append(st.secrets["GEMINI_API_KEY"])
+    
+    # Captura chaves adicionais numeradas (ex: GEMINI_API_KEY_2, GEMINI_API_KEY_3)
+    for k in st.secrets:
+        if k.startswith("GEMINI_API_KEY_") and st.secrets[k]:
+            chaves.append(st.secrets[k])
+            
+    # Fallback para variável de ambiente
+    env_key = os.environ.get("GEMINI_API_KEY", "")
+    if env_key and env_key not in chaves:
+        chaves.append(env_key)
+        
+    st.session_state.lista_chaves = chaves
+    st.session_state.indice_chave_atual = 0
+
 # Função auxiliar de match inteligente entre a descrição da IA e a tabela FVU
 def encontrar_fvu_por_descricao(descricao_ia, fvu_data):
     if not descricao_ia or not fvu_data:
@@ -137,8 +157,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-api_key = os.environ.get("GEMINI_API_KEY", "") or st.secrets.get("GEMINI_API_KEY", "")
-
 # ==============================================================================
 # CABEÇALHO
 # ==============================================================================
@@ -216,27 +234,25 @@ with st.container(border=True):
     if st.button("📤 Gerar Laudo", type="primary", use_container_width=True):
         if not uploaded_files:
             st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
-        elif not api_key:
-            st.error("⚠️ Chave de API do Gemini não configurada no servidor (GEMINI_API_KEY).")
+        elif not st.session_state.get("lista_chaves"):
+            st.error("⚠️ Nenhuma Chave de API do Gemini foi configurada nos segredos (GEMINI_API_KEY).")
         else:
             if "inspection_results" not in st.session_state:
                 st.session_state.inspection_results = []
 
             try:
                 import google.generativeai as genai
-                genai.configure(api_key=api_key)
-
+                
                 texto_status = st.empty()
                 texto_status.info("Inspecionando imagens com alta precisão visual...")
 
                 fvu_data = carregar_tabela_fvu()
-                nome_modelo_ativo = obter_modelo_estavel(genai)
-                model = genai.GenerativeModel(nome_modelo_ativo)
                 
+                # Prepara o conteúdo da requisição
                 dict_fotos_enviadas = {f.name: f for f in uploaded_files}
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
-                prompt_instrucoes = f"""
+                prompt_instrucoes = """
                 Você é um inspetor técnico especialista em pneus de frotas pesadas.
                 Abaixo estão fotos enviadas. Agrupe as fotos de CADA pneu e analise.
 
@@ -248,14 +264,14 @@ with st.container(border=True):
 
                 Responda SOMENTE com um array JSON válido (um objeto por pneu):
                 [
-                  {{
+                  {
                     "fogo": "string",
                     "marca": "string",
                     "sulco": "string",
                     "arquivos_fotos": ["nome_arquivo1.jpg", "nome_arquivo2.jpg"],
                     "descricao_dano_ia": "string",
                     "confianca": "Alta | Média | Baixa"
-                  }}
+                  }
                 ]
                 """
 
@@ -266,27 +282,42 @@ with st.container(border=True):
                     conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
                 conteudo_requisicao.append(prompt_instrucoes)
 
-                # Tratamento robusto para o erro 429 (Quota Excedida) com loop de retry automático
-                max_tentativas = 3
-                tentativa = 0
+                # ==============================================================
+                # SISTEMA DE ROTAÇÃO AUTOMÁTICA DE CHAVES E RETRY
+                # ==============================================================
+                lista_chaves = st.session_state.lista_chaves
+                total_chaves = len(lista_chaves)
+                tentativa_chave = 0
                 sucesso = False
                 resposta_ia = None
+                nome_modelo_ativo = ""
 
-                while tentativa < max_tentativas and not sucesso:
+                while tentativa_chave < total_chaves and not sucesso:
                     try:
-                        texto_status.info(f"Processando análise visual ({nome_modelo_ativo}) [Tentativa {tentativa+1}/{max_tentativas}]...")
+                        chave_atual = lista_chaves[st.session_state.indice_chave_atual]
+                        genai.configure(api_key=chave_atual)
+                        
+                        nome_modelo_ativo = obter_modelo_estavel(genai)
+                        model = genai.GenerativeModel(nome_modelo_ativo)
+                        
+                        texto_status.info(f"Processando com modelo {nome_modelo_ativo} [Chave {st.session_state.indice_chave_atual + 1}/{total_chaves}]...")
                         resposta_ia = model.generate_content(conteudo_requisicao)
                         sucesso = True
+                        
                     except Exception as e:
                         erro_str = str(e)
                         if "429" in erro_str or "ResourceExhausted" in type(e).__name__ or "quota" in erro_str.lower():
-                            tentativa += 1
-                            if tentativa < max_tentativas:
-                                tempo_espera = 15 * tentativa
-                                texto_status.warning(f"⚠️ Limite de cota excedido (Erro 429). Aguardando {tempo_espera}s para tentar novamente de forma automática...")
-                                time.sleep(tempo_espera)
+                            tentativa_chave += 1
+                            if tentativa_chave < total_chaves:
+                                # Alterna para a próxima chave da lista de forma circular
+                                st.session_state.indice_chave_atual = (st.session_state.indice_chave_atual + 1) % total_chaves
+                                texto_status.warning(f"⚠️ Cota esgotada na chave atual (Erro 429). Alternando automaticamente para a próxima chave ({tentativa_chave}/{total_chaves})...")
+                                time.sleep(2)
                             else:
-                                raise RuntimeError(f"Limite de cota da API do Gemini excedido (Erro 429). Aguarde alguns segundos e tente novamente. Detalhes: {e}")
+                                # Se todas as chaves falharam por 429, faz fallback para espera progressiva na chave atual
+                                texto_status.warning(f"⚠️ Todas as chaves atingiram o limite de cota. Aguardando 15s para nova tentativa...")
+                                time.sleep(15)
+                                raise RuntimeError(f"Limite de cota excedido em todas as chaves disponíveis. Detalhes: {e}")
                         else:
                             raise e
 
