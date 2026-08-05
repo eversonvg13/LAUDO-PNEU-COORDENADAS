@@ -31,8 +31,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'HeaderTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=16,  # Era 11
-        leading=18,   # Era 14
+        fontSize=20,  # Era 11
+        leading=16,   # Era 14
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
     )
