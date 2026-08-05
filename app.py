@@ -5,6 +5,28 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
+# Adicione esta função perto do topo, logo após os "imports"
+@st.cache_data(show_spinner=False)
+def carregar_tabela_fvu():
+    """Lê a planilha local e extrai os padrões de laudo (aba FVU)."""
+    try:
+        # Lê a planilha, certificando-se de que ela está na mesma pasta do app.py
+        df_fvu = pd.read_excel("Laudos de Pneus Romulo.xlsx", sheet_name="FVU")
+        df_fvu = df_fvu.dropna(subset=['FVU'])
+        
+        lista_fvu = []
+        for _, row in df_fvu.iterrows():
+            lista_fvu.append({
+                "codigo": str(row['FVU']).strip(),
+                "descricao": "" if pd.isna(row['DESCRIÇÃO']) else str(row['DESCRIÇÃO']).strip(),
+                "causa": "" if pd.isna(row['CAUSA']) else str(row['CAUSA']).strip(),
+                "acao": "" if pd.isna(row['AÇÃO']) else str(row['AÇÃO']).strip()
+            })
+        return lista_fvu
+    except Exception as e:
+        st.error(f"⚠️ Erro ao carregar a planilha 'Laudos de Pneus Romulo.xlsx': {e}")
+        return []
+
 # Adicione isso logo após as importações iniciais
 @st.cache_data(show_spinner=False)
 def gerar_pdf_em_cache(pneu_dict, data_str):
@@ -229,40 +251,44 @@ with st.container(border=True):
                 genai.configure(api_key=api_key)
 
                 texto_status = st.empty()
-                texto_status.info("Selecionando modelo estável...")
+                texto_status.info("Conectando ao modelo da IA e lendo planilha de classificação...")
+
+                # 1. Carrega os padrões FVU
+                fvu_data = carregar_tabela_fvu()
+                
+                # 2. Monta o texto de opções para a IA ler
+                fvu_opcoes_prompt = "CLASSIFICAÇÃO DE DANOS (TABELA FVU):\n"
+                for item in fvu_data:
+                    fvu_opcoes_prompt += f"- CÓDIGO: {item['codigo']} | DANO: {item['descricao']}\n"
 
                 nome_modelo_ativo = obter_modelo_estavel(genai)
-                texto_status.info(f"Conectado ao modelo: {nome_modelo_ativo}. Comprimindo lote de fotos...")
-
                 model = genai.GenerativeModel(nome_modelo_ativo)
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
+                # 3. Novo prompt forçando o uso dos códigos
                 prompt_instrucoes = f"""
                 Você é um inspetor especialista em inventário de pneus de frota (SMART-LOG).
                 Abaixo estão {len(sorted_files)} fotos ordenadas cronologicamente.
 
                 Sua tarefa:
-                1. Analise todas as imagens e agrupe-as por pneu individual. Cada novo pneu começa com a
-                   foto da lateral contendo o número de 'Fogo' (identificação pintada em giz/tinta, ex: 32813),
-                   seguida das fotos de banda de rodagem/sulco/danos daquele pneu até a próxima foto de 'Fogo'.
-                2. Para cada pneu, leia o número de Fogo exatamente como aparece na foto.
-                3. Modo de análise solicitado: {modo_analise}.
+                1. Analise as imagens e agrupe-as por pneu individual.
+                2. Leia o número de Fogo exatamente como aparece na foto.
+                3. OBRIGATÓRIO: Baseado no dano visual encontrado na banda/flanco, classifique o problema escolhendo um dos seguintes Códigos FVU:
+                
+                {fvu_opcoes_prompt}
 
-                Responda SOMENTE com um array JSON válido (nada de texto antes ou depois, nada de markdown),
-                no seguinte formato exato, um objeto por pneu:
+                Se o pneu não possuir avarias severas, use o código "OK".
 
+                Responda SOMENTE com um array JSON válido (um objeto por pneu):
                 [
                   {{
-                    "fogo": "string (número lido na foto)",
-                    "marca": "string (observado na foto)",
-                    "sulco": "string (observado na foto)",
-                    "danos": "string (observado na foto)",
-                    "acao_recomendada": "string",
+                    "fogo": "string",
+                    "marca": "string",
+                    "sulco": "string",
+                    "codigo_fvu": "string (Retorne APENAS o código, ex: 45D, 71k, etc)",
                     "confianca": "Alta | Média | Baixa"
                   }}
                 ]
-
-                NÃO invente dados de placa, posição, quilometragem ou datas.
                 """
 
                 conteudo_requisicao = []
@@ -272,7 +298,7 @@ with st.container(border=True):
                     conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
                 conteudo_requisicao.append(prompt_instrucoes)
 
-                texto_status.info(f"Enviando dados para a IA ({nome_modelo_ativo})... aguarde, isso pode levar alguns minutos.")
+                texto_status.info(f"Enviando fotos e parâmetros FVU para a IA ({nome_modelo_ativo})...")
                 resposta_ia = model.generate_content(conteudo_requisicao)
 
                 pneus_estruturados = None
@@ -281,9 +307,26 @@ with st.container(border=True):
                     pneus_ia = extrair_json_da_resposta(resposta_ia.text)
                     tabela_df = st.session_state.dados_relatorio
                     pneus_estruturados = []
+                    
                     for item in pneus_ia:
                         fogo_lido = str(item.get("fogo", "")).strip()
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
+                        
+                        # 4. Lê o código que a IA escolheu
+                        codigo_ia = str(item.get("codigo_fvu", "")).strip()
+                        
+                        # 5. Busca as frases completas correspondentes na planilha
+                        fvu_selecionado = next((x for x in fvu_data if x['codigo'].lower() == codigo_ia.lower()), None)
+                        
+                        if fvu_selecionado:
+                            texto_dano = fvu_selecionado["descricao"]
+                            texto_causa = fvu_selecionado["causa"]
+                            texto_acao = fvu_selecionado["acao"]
+                        else:
+                            # Caso a IA não consiga identificar ou retorne "OK"
+                            texto_dano = "Sem avarias severas catalogadas."
+                            texto_causa = "-"
+                            texto_acao = "Acompanhamento de rotina. Calibração periódica e medição de sulco."
 
                         pneu = {
                             "fogo": fogo_lido,
@@ -296,15 +339,20 @@ with st.container(border=True):
                             "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
                             "marca": item.get("marca", ""),
                             "sulco": item.get("sulco", ""),
-                            "danos": item.get("danos", ""),
-                            "acao_recomendada": item.get("acao_recomendada", ""),
+                            
+                            # 6. Injeta os dados padrões oficiais direto no Laudo!
+                            "danos": texto_dano,
+                            "causas_provaveis": texto_causa,
+                            "observacoes": texto_acao,
+                            "acao_recomendada": texto_acao,
+                            
                             "confianca": item.get("confianca", ""),
                             "fogo_localizado_na_planilha": dados_tabela is not None,
                         }
                         pneus_estruturados.append(pneu)
                 except Exception as e:
                     erro_parse = str(e)
-
+                            
                 st.session_state.inspection_results = [{
                     "Timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "Modelo_Usado": nome_modelo_ativo,
