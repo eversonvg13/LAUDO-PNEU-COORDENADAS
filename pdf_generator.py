@@ -83,9 +83,18 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             break
             
     if logo_path:
-        # Passar apenas a largura mantém a proporção original da imagem sem achatar
-        img_logo = RLImage(logo_path, width=40)
+        try:
+            with PILImage.open(logo_path) as pil_img:
+                orig_w, orig_h = pil_img.size
+                desired_w = 95  # Largura padrão controlada
+                desired_h = (orig_h * desired_w) / orig_w  # Altura proporcional matemática
+            img_logo = RLImage(logo_path, width=desired_w, height=desired_h)
+        except Exception:
+            img_logo = RLImage(logo_path, width=95, height=32)
+        
         img_logo.hAlign = 'LEFT'
+            
+   
         header_table_data = [
             [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
         ]
