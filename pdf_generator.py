@@ -15,7 +15,6 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
 def gerar_pdf_laudo_pneu(pneu, data_analise):
     buffer = io.BytesIO()
-    # Margens otimizadas para aproveitar melhor a página A4 inteira
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -55,18 +54,28 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         textColor=colors.HexColor('#000000')
     )
     
+    # Fonte maior e em preto puro para melhor legibilidade das descrições
     style_section_body = ParagraphStyle(
         'SectionBody',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8,
-        leading=10.5,
-        textColor=colors.HexColor('#333333')
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor('#000000')
+    )
+
+    style_garagem_lines = ParagraphStyle(
+        'GaragemLines',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.HexColor('#999999')
     )
     
     story = []
     
-    # 1. Cabeçalho com Logo
+    # 1. Cabeçalho com Logo (Proporção corrigida informando apenas a largura)
     logo_path = None
     for nome_img in ["ssasdsds.png", "logo-nobg.png", "logo.png"]:
         if os.path.exists(nome_img):
@@ -74,7 +83,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             break
             
     if logo_path:
-        img_logo = RLImage(logo_path, width=110, height=35)
+        # Passar apenas a largura mantém a proporção original da imagem sem achatar
+        img_logo = RLImage(logo_path, width=95)
         img_logo.hAlign = 'LEFT'
         header_table_data = [
             [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
@@ -160,7 +170,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         [Paragraph(danos, style_section_body)],
         [Paragraph(f"<b>Causas prováveis:</b> {causas}", style_section_body)],
         [Paragraph(f"<b>Observações:</b> {obs}", style_section_body)],
-        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=7 color='#555555'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Enc. Borracharia</font>", style_section_body)]
+        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=7 color='#333333'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Enc. Borracharia</font>", style_section_body)]
     ]
     
     t_secoes = Table(secoes_data, colWidths=[560])
@@ -175,11 +185,12 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(t_secoes)
     story.append(Spacer(1, 3))
     
-    # 4. Bloco da Garagem Ampliado (Com mais linhas para respostas completas)
-    linhas_pautadas = "<br/>".join(["_________________________________________________________________________________________"] * 8)
+    # 4. Bloco da Garagem Ampliado (Linhas estendidas até as bordas e quantidade aumentada)
+    linha_completa = "_" * 110
+    linhas_pautadas = "<br/>".join([linha_completa] * 14)
     espaco_garagem_data = [
         [Paragraph("<b>Resposta da Garagem (Defeitos encontrados no veículo / Ações executadas):</b>", style_section_title)],
-        [Paragraph(f"<font color='#cccccc'>{linhas_pautadas}</font>", style_section_body)],
+        [Paragraph(linhas_pautadas, style_garagem_lines)],
     ]
     t_garagem = Table(espaco_garagem_data, colWidths=[560])
     t_garagem.setStyle(TableStyle([
@@ -209,19 +220,18 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     ]))
     story.append(t_assinatura)
     
-    # 6. Fotos Específicas do Pneu (Tamanho ampliado para melhor visualização)
+    # 6. Fotos Específicas do Pneu (Deslocadas um pouco mais para baixo com espaçamento maior)
     imagens_pneu = pneu.get('imagens_bytes', [])
     if imagens_pneu:
-        story.append(Spacer(1, 4))
+        story.append(Spacer(1, 10))  # Espaçamento maior para posicionar as fotos mais abaixo
         story.append(Paragraph("<b>Registro Fotográfico do Pneu:</b>", style_section_title))
-        story.append(Spacer(1, 2))
+        story.append(Spacer(1, 4))
         
         img_table_data = []
         linha_atual = []
         for img_bytes in imagens_pneu:
             try:
                 img_io = io.BytesIO(img_bytes)
-                # Fotos aumentadas para preencher o espaço vertical restante da página
                 rl_img = RLImage(img_io, width=230, height=145)
                 linha_atual.append(rl_img)
                 if len(linha_atual) == 2:
