@@ -259,7 +259,7 @@ with st.container(border=True):
                 Sua tarefa para cada pneu nas fotos:
                 1. Leia o número de Fogo escrito a giz.
                 2. Indique a lista EXATA de nomes dos arquivos de imagem que pertencem a este pneu na propriedade "arquivos_fotos".
-                3. Identifique a marca e estado geral do sulco.
+                3. Identifique a marca e estado geral do pneu.
                 4. Descreva detalhadamente o dano visual encontrado ou o estado de conservação.
 
                 Responda SOMENTE com um array JSON válido (um objeto por pneu):
@@ -372,7 +372,7 @@ with st.container(border=True):
                             "local": dados_tabela.get("LOCAL", "") if dados_tabela else "",
                             "km_pos": dados_tabela.get("KM/POS", "") if dados_tabela else "",
                             "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
-                            "n_reformas": dados_tabela.get("Re", "") if dados_tabela else "",
+                            "n_reformas": dados_tabela.get("REFORMA", "") if dados_tabela else "",
                             "marca": item.get("marca", ""),
                             "sulco": item.get("sulco", ""),
                             "codigo_fvu": codigo_fvu,
