@@ -1,188 +1,206 @@
 import io
-from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import mm
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
-def gerar_pdf_laudo_pneu(pneu: dict, data_analise: str = None) -> bytes:
-    """
-    Gera o laudo individual de um único pneu no layout SGQ 391/15-Rev01 (Grupo Empresarial Coordenadas).
-    """
+def gerar_pdf_laudo_pneu(pneu, data_analise):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=10 * mm,
-        leftMargin=10 * mm,
-        topMargin=10 * mm,
-        bottomMargin=10 * mm
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=30,
+        bottomMargin=30
     )
     
-    elements = []
     styles = getSampleStyleSheet()
-
-    # Estilos de Texto
-    style_title = ParagraphStyle(
-        'DocTitle',
+    
+    # Estilos personalizados para o padrão corporativo
+    style_header_title = ParagraphStyle(
+        'HeaderTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=12,
-        alignment=0,
-        textColor=colors.HexColor("#000000")
+        fontSize=11,
+        leading=14,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#000000')
     )
     
     style_header_sub = ParagraphStyle(
         'HeaderSub',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8,
-        alignment=2,
-        textColor=colors.HexColor("#333333")
+        fontSize=9,
+        leading=12,
+        alignment=TA_RIGHT,
+        textColor=colors.HexColor('#333333')
     )
-
-    style_cell_val = ParagraphStyle(
-        'CellVal',
+    
+    style_cell_value = ParagraphStyle(
+        'CellValue',
         parent=styles['Normal'],
         fontName='Helvetica',
         fontSize=8,
         leading=10,
-        textColor=colors.HexColor("#000000")
+        textColor=colors.HexColor('#000000')
     )
-
+    
     style_section_title = ParagraphStyle(
         'SectionTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
-        textColor=colors.HexColor("#000000")
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor('#000000')
     )
-
-    style_body_text = ParagraphStyle(
-        'BodyTextCustom',
+    
+    style_section_body = ParagraphStyle(
+        'SectionBody',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8,
+        fontSize=8.5,
         leading=11,
-        textColor=colors.HexColor("#111111")
+        textColor=colors.HexColor('#333333')
     )
-
-    # --- 1. CABEÇALHO ---
+    
+    story = []
+    
+    # 1. Cabeçalho Oficial
     header_data = [
         [
-            Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_title),
+            Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title),
             Paragraph("<b>SGQ 391/15-Rev01</b>", style_header_sub)
         ]
     ]
-    t_header = Table(header_data, colWidths=[140 * mm, 50 * mm])
+    t_header = Table(header_data, colWidths=[400, 135])
     t_header.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
-    elements.append(t_header)
-    elements.append(Spacer(1, 3 * mm))
-
-    # --- 2. GRADE DE DADOS DO PNEU ---
-    dt_str = data_analise or datetime.now().strftime("%d/%m/%Y")
+    story.append(t_header)
+    story.append(Spacer(1, 6))
+    
+    # 2. Grid de Informações (Padrão 4x3)
+    unidade = pneu.get('local', '') or '-'
+    fogo = str(pneu.get('fogo', ''))
+    veiculo = str(pneu.get('veiculo', ''))
+    medida = str(pneu.get('medida', ''))
+    posicao = str(pneu.get('pos', ''))
+    km_pos = str(pneu.get('km_pos', ''))
+    retirada = str(pneu.get('retirada', ''))
+    km_total = str(pneu.get('km_total', ''))
+    valor_sugerido = pneu.get('valor_sugerido', 'R$ 600,00')
+    valor_cobrado = pneu.get('valor_cobrado', '')
+    n_reformas = str(pneu.get('n_reformas', '0'))
     
     grid_data = [
         [
-            Paragraph(f"<b>UNIDADE:</b> {pneu.get('local', 'UBERLANDIA')}", style_cell_val),
-            Paragraph(f"<b>Nº FOGO PNEU:</b> {pneu.get('fogo', '')}", style_cell_val),
-            Paragraph(f"<b>DATA DA ANÁLISE:</b> {dt_str}", style_cell_val),
+            Paragraph(f"<b>UNIDADE:</b> {unidade}", style_cell_value),
+            Paragraph(f"<b>Nº FOGO PNEU:</b> {fogo}", style_cell_value),
+            Paragraph(f"<b>DATA DA ANÁLISE:</b> {data_analise}", style_cell_value)
         ],
         [
-            Paragraph(f"<b>VEÍCULO:</b> {pneu.get('veiculo', '')}", style_cell_val),
-            Paragraph(f"<b>MEDIDA PNEU:</b> {pneu.get('medida', '')}", style_cell_val),
-            Paragraph(f"<b>VALOR SUGERIDO:</b> {pneu.get('valor_sugerido', 'R$ 600,00')}", style_cell_val),
+            Paragraph(f"<b>VEÍCULO:</b> {veiculo}", style_cell_value),
+            Paragraph(f"<b>MEDIDA PNEU:</b> {medida}", style_cell_value),
+            Paragraph(f"<b>VALOR SUGERIDO:</b> {valor_sugerido}", style_cell_value)
         ],
         [
-            Paragraph(f"<b>POSIÇÃO:</b> {pneu.get('pos', '')}", style_cell_val),
-            Paragraph(f"<b>KM POSIÇÃO:</b> {pneu.get('km_pos', '')}", style_cell_val),
-            Paragraph(f"<b>VALOR COBRADO:</b> {pneu.get('valor_cobrado', '')}", style_cell_val),
+            Paragraph(f"<b>POSIÇÃO:</b> {posicao}", style_cell_value),
+            Paragraph(f"<b>KM POSIÇÃO:</b> {km_pos}", style_cell_value),
+            Paragraph(f"<b>VALOR COBRADO:</b> {valor_cobrado}", style_cell_value)
         ],
         [
-            Paragraph(f"<b>RETIRADA:</b> {pneu.get('retirada', '')}", style_cell_val),
-            Paragraph(f"<b>KM TOTAL:</b> {pneu.get('km_total', '')}", style_cell_val),
-            Paragraph(f"<b>Nº REFORMAS:</b> {pneu.get('n_reformas', '0')}", style_cell_val),
+            Paragraph(f"<b>RETIRADA:</b> {retirada}", style_cell_value),
+            Paragraph(f"<b>KM TOTAL:</b> {km_total}", style_cell_value),
+            Paragraph(f"<b>Nº REFORMAS:</b> {n_reformas}", style_cell_value)
         ]
-    ]
-
-    t_grid = Table(grid_data, colWidths=[63 * mm, 63 * mm, 64 * mm])
-    t_grid.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#000000")),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 3),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
-        ('RIGHTPADDING', (0,0), (-1,-1), 4),
-    ]))
-    elements.append(t_grid)
-    elements.append(Spacer(1, 3 * mm))
-
-    # --- 3. SEÇÕES DE LAUDO / CAUSAS / OBSERVAÇÕES ---
-    laudo_relatado = pneu.get('danos') or pneu.get('laudo_relatado') or "Desgaste irregular da Banda de Rodagem."
-    causas = pneu.get('causas_provaveis') or "Folgas nas mangas, cubos, buchas estouradas, veículo desalinhado."
-    obs = pneu.get('acao_recomendada') or pneu.get('observacoes') or (
-        "Verificar folgas nas mangas, cubos e eixos, verificar buchas das barras, amortecedores e suspensão em geral, "
-        "verificar alinhamento do veículo. Orientar o colaborador a efetuar rodízios e 'viradas na roda' quando necessário, "
-        "além de fazer o acompanhamento das profundidades dos sulcos no pneu."
-    )
-
-    text_block = [
-        [Paragraph("<b>Laudo relatado por:</b>", style_section_title)],
-        [Paragraph(laudo_relatado, style_body_text)],
-        [Spacer(1, 1.5 * mm)],
-        [Paragraph("<b>Causas prováveis:</b>", style_section_title)],
-        [Paragraph(causas, style_body_text)],
-        [Spacer(1, 1.5 * mm)],
-        [Paragraph("<b>Observações:</b>", style_section_title)],
-        [Paragraph(obs, style_body_text)],
     ]
     
-    t_text = Table(text_block, colWidths=[190 * mm])
-    t_text.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#000000")),
-        ('TOPPADDING', (0,0), (-1,-1), 3),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
-        ('RIGHTPADDING', (0,0), (-1,-1), 4),
+    t_grid = Table(grid_data, colWidths=[175, 180, 180])
+    t_grid.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
-    elements.append(t_text)
-    elements.append(Spacer(1, 4 * mm))
-
-    # --- 4. ASSINATURAS E VISTOS ---
-    sig_data = [
+    story.append(t_grid)
+    story.append(Spacer(1, 8))
+    
+    # 3. Seções de Laudo, Causas e Observações
+    danos = pneu.get('danos', '') or pneu.get('descricao_dano_ia', '')
+    causas = pneu.get('causas_provaveis', '')
+    obs = pneu.get('observacoes', '') or pneu.get('acao_recomendada', '')
+    
+    secoes_data = [
+        [Paragraph("<b>Laudo relatado por:</b>", style_section_title)],
+        [Paragraph(danos, style_section_body)],
+        [Paragraph("<b>Causas prováveis:</b>", style_section_title)],
+        [Paragraph(causas, style_section_body)],
+        [Paragraph("<b>Observações:</b>", style_section_title)],
+        [Paragraph(obs, style_section_body)]
+    ]
+    
+    t_secoes = Table(secoes_data, colWidths=[535])
+    t_secoes.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cccccc')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#f5f5f5')),
+        ('BACKGROUND', (0,2), (0,2), colors.HexColor('#f5f5f5')),
+        ('BACKGROUND', (0,4), (0,4), colors.HexColor('#f5f5f5')),
+    ]))
+    story.append(t_secoes)
+    story.append(Spacer(1, 10))
+    
+    # 4. Assinaturas e Vistos no Rodapé
+    assinatura_data = [
         [
-            Paragraph("<b>Everson Veloso</b><br/>Enc. Borracharia", style_body_text),
-            Paragraph("<b>Visto líder de manutenção:</b>", style_body_text),
-            Paragraph("<b>VISTO GERENTE:</b>", style_body_text),
+            Paragraph("<b>Everson Veloso</b><br/>Enc. Borracharia", style_cell_value),
+            Paragraph("<b>Visto líder de manutenção:</b> ____________________", style_cell_value),
+            Paragraph("<b>VISTO GERENTE:</b> ____________________", style_cell_value)
         ]
     ]
-    t_sig = Table(sig_data, colWidths=[63 * mm, 63 * mm, 64 * mm])
-    t_sig.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('TOPPADDING', (0,0), (-1,-1), 2),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+    t_assinatura = Table(assinatura_data, colWidths=[140, 200, 195])
+    t_assinatura.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
-    elements.append(t_sig)
-
-    doc.build(elements)
+    story.append(t_assinatura)
+    
+    doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
 
-def gerar_pdf_fallback(texto_bruto: str, timestamp: str) -> bytes:
-    """Fallback caso haja algum erro estrutural no JSON da IA."""
+def gerar_pdf_fallback(texto_bruto, data_str):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     styles = getSampleStyleSheet()
-    elements = [
-        Paragraph(f"<b>Laudo Simplificado - {timestamp}</b>", styles['Title']),
+    story = [
+        Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS - SGQ 391/15-Rev01</b>", styles['Heading1']),
         Spacer(1, 10),
-        Paragraph(texto_bruto.replace('\n', '<br/>'), styles['BodyText'])
+        Paragraph(f"<b>Data:</b> {data_str}", styles['Normal']),
+        Spacer(1, 10),
+        Paragraph(texto_bruto.replace('\n', '<br/>'), styles['Normal'])
     ]
-    doc.build(elements)
+    doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
