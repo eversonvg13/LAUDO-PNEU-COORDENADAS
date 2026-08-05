@@ -107,9 +107,9 @@ col_logo, col_header = st.columns([1, 8], vertical_alignment="center")
 
 with col_logo:
     if os.path.exists("ssasdsds.png"):
-        st.image("ssasdsds.png", width=340)
+        st.image("ssasdsds.png", width=240)
     elif os.path.exists("logo-nobg.png"):
-        st.image("logo-nobg.png", width=340)
+        st.image("logo-nobg.png", width=240)
     else:
         st.write("🧭")
 
