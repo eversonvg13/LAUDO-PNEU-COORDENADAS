@@ -235,7 +235,6 @@ with st.container(border=True):
                 model = genai.GenerativeModel(nome_modelo_ativo)
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
-                # Prompt limpo e focado 100% na visão da IA (sem poluição de listas longas)
                 prompt_instrucoes = f"""
                 Você é um inspetor técnico especialista em pneus de frotas pesadas.
                 Abaixo estão {len(sorted_files)} fotos ordenadas cronologicamente. Cada pneu começa com a foto do número de 'Fogo' escrito a giz.
@@ -274,11 +273,19 @@ with st.container(border=True):
                     tabela_df = st.session_state.dados_relatorio
                     pneus_estruturados = []
                     
+                    # Converte as imagens enviadas para bytes para incluir no PDF
+                    imagens_bytes_list = []
+                    for img_file in sorted_files:
+                        try:
+                            img_file.seek(0)
+                            imagens_bytes_list.append(img_file.getvalue())
+                        except Exception:
+                            pass
+                    
                     for item in pneus_ia:
                         fogo_lido = str(item.get("fogo", "")).strip()
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
                         
-                        # O Python cruza a descrição livre da IA com a planilha FVU
                         desc_ia = item.get("descricao_dano_ia", "")
                         fvu_selecionado = encontrar_fvu_por_descricao(desc_ia, fvu_data)
                         
@@ -292,17 +299,6 @@ with st.container(border=True):
                             texto_dano = desc_ia or "Sem avarias severas catalogadas."
                             texto_causa = "-"
                             texto_acao = "Acompanhamento de rotina."
-
-                        # Converte as imagens enviadas para bytes para incluir no PDF
-                        imagens_bytes_list = []
-                        if "Imagens" in res and res["Imagens"]:
-                            for img_file in res["Imagens"]:
-                                try:
-                                    # Garante que o ponteiro do arquivo está no início
-                                    img_file.seek(0)
-                                    imagens_bytes_list.append(img_file.getvalue())
-                                except Exception:
-                                    pass
 
                         pneu = {
                             "fogo": fogo_lido,
@@ -322,7 +318,7 @@ with st.container(border=True):
                             "acao_recomendada": texto_acao,
                             "confianca": item.get("confianca", ""),
                             "fogo_localizado_na_planilha": dados_tabela is not None,
-                            "imagens_bytes": imagens_bytes_list,  # <--- CHAVE ADICIONADA PARA AS FOTOS
+                            "imagens_bytes": imagens_bytes_list,
                         }
                         pneus_estruturados.append(pneu)
                 except Exception as e:
