@@ -470,7 +470,7 @@ if st.session_state.get("inspection_results"):
                             st.write(f"**VEÍCULO:** {pneu_exibicao.get('veiculo', '')}")
                             st.write(f"**MEDIDA:** {pneu_exibicao.get('medida', '')}")
                             st.write(f"**RETIRADA:** {pneu_exibicao.get('retirada', '')}")
-                            st.write(f"**Nº REFORMAS:** {pneu_exibicao.get('n_reformas', '0')}")
+                            st.write(f"**Nº REFORMAS:** {pneu_exibicao.get('n_reformas', '')}")
                         with c2:
                             st.write(f"**LOCAL/UNIDADE:** {pneu_exibicao.get('local', '')}")
                             st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
