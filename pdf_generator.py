@@ -1,4 +1,5 @@
 import io
+import os
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import (
@@ -6,10 +7,11 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
     Table,
-    TableStyle
+    TableStyle,
+    Image as RLImage
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
 def gerar_pdf_laudo_pneu(pneu, data_analise):
     buffer = io.BytesIO()
@@ -18,13 +20,12 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         pagesize=A4,
         rightMargin=30,
         leftMargin=30,
-        topMargin=30,
-        bottomMargin=30
+        topMargin=25,
+        bottomMargin=25
     )
     
     styles = getSampleStyleSheet()
     
-    # Estilos personalizados para o padrão corporativo
     style_header_title = ParagraphStyle(
         'HeaderTitle',
         parent=styles['Normal'],
@@ -33,16 +34,6 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         leading=14,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
-    )
-    
-    style_header_sub = ParagraphStyle(
-        'HeaderSub',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=9,
-        leading=12,
-        alignment=TA_RIGHT,
-        textColor=colors.HexColor('#333333')
     )
     
     style_cell_value = ParagraphStyle(
@@ -58,8 +49,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'SectionTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=9,
-        leading=12,
+        fontSize=8.5,
+        leading=11,
         textColor=colors.HexColor('#000000')
     )
     
@@ -67,27 +58,42 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'SectionBody',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8.5,
-        leading=11,
+        fontSize=8,
+        leading=10.5,
         textColor=colors.HexColor('#333333')
     )
     
     story = []
     
-    # 1. Cabeçalho Oficial
-    header_data = [
-        [
-            Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title),
-            Paragraph("<b>SGQ 391/15-Rev01</b>", style_header_sub)
+    # 1. Cabeçalho com Logo (Procurando a imagem da logo)
+    logo_path = None
+    for nome_img in ["ssasdsds.png", "logo-nobg.png", "logo.png"]:
+        if os.path.exists(nome_img):
+            logo_path = nome_img
+            break
+            
+    if logo_path:
+        img_logo = RLImage(logo_path, width=110, height=35)
+        img_logo.hAlign = 'LEFT'
+        header_table_data = [
+            [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
         ]
-    ]
-    t_header = Table(header_data, colWidths=[400, 135])
+        t_header = Table(header_table_data, colWidths=[120, 305, 110])
+    else:
+        header_table_data = [
+            [Paragraph("<b>COORDENADAS</b>", style_header_title), Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
+        ]
+        t_header = Table(header_table_data, colWidths=[120, 305, 110])
+        
     t_header.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#e5e7eb')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
         ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
     story.append(t_header)
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 4))
     
     # 2. Grid de Informações (Padrão 4x3)
     unidade = pneu.get('local', '') or '-'
@@ -129,63 +135,110 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     t_grid.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('LEFTPADDING', (0,0), (-1,-1), 6),
-        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('LEFTPADDING', (0,0), (-1,-1), 5),
+        ('RIGHTPADDING', (0,0), (-1,-1), 5),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     story.append(t_grid)
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 4))
     
-    # 3. Seções de Laudo, Causas e Observações
+    # 3. Laudo, Causas e Observações
     danos = pneu.get('danos', '') or pneu.get('descricao_dano_ia', '')
     causas = pneu.get('causas_provaveis', '')
     obs = pneu.get('observacoes', '') or pneu.get('acao_recomendada', '')
     
     secoes_data = [
-        [Paragraph("<b>Laudo relatado por:</b>", style_section_title)],
         [Paragraph(danos, style_section_body)],
-        [Paragraph("<b>Causas prováveis:</b>", style_section_title)],
-        [Paragraph(causas, style_section_body)],
-        [Paragraph("<b>Observações:</b>", style_section_title)],
-        [Paragraph(obs, style_section_body)]
+        [Paragraph(f"<b>Causas prováveis:</b> {causas}", style_section_body)],
+        [Paragraph(f"<b>Observações:</b> {obs}", style_section_body)],
+        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=7 color='#555555'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Enc. Borracharia</font>", style_section_body)]
     ]
     
     t_secoes = Table(secoes_data, colWidths=[535])
     t_secoes.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cccccc')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
         ('TOPPADDING', (0,0), (-1,-1), 4),
         ('BOTTOMPADDING', (0,0), (-1,-1), 4),
         ('LEFTPADDING', (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 6),
-        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#f5f5f5')),
-        ('BACKGROUND', (0,2), (0,2), colors.HexColor('#f5f5f5')),
-        ('BACKGROUND', (0,4), (0,4), colors.HexColor('#f5f5f5')),
     ]))
     story.append(t_secoes)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 4))
     
-    # 4. Assinaturas e Vistos no Rodapé
+    # 4. Bloco de Resposta da Garagem (Espaço pautado com linhas)
+    espaco_garagem_data = [
+        [Paragraph("<b>Resposta da Garagem (Defeitos encontrados no veículo / Ações executadas):</b>", style_section_title)],
+        [Paragraph("<br/><br/><br/><br/><br/>", style_section_body)], # Espaço em branco com linhas
+    ]
+    t_garagem = Table(espaco_garagem_data, colWidths=[535])
+    t_garagem.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
+        ('LINEBELOW', (0,0), (0,0), 1, colors.HexColor('#000000')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#f9fafb')),
+    ]))
+    story.append(t_garagem)
+    story.append(Spacer(1, 4))
+    
+    # 5. Assinaturas e Vistos (Líder + Coordenador de Manutenção)
     assinatura_data = [
         [
-            Paragraph("<b>Everson Veloso</b><br/>Enc. Borracharia", style_cell_value),
-            Paragraph("<b>Visto líder de manutenção:</b> ____________________", style_cell_value),
-            Paragraph("<b>VISTO GERENTE:</b> ____________________", style_cell_value)
+            Paragraph("<b>Visto líder de manutenção:</b> ________________________", style_cell_value),
+            Paragraph("<b>Visto Coordenador de Manutenção:</b> ________________________", style_cell_value)
         ]
     ]
-    t_assinatura = Table(assinatura_data, colWidths=[140, 200, 195])
+    t_assinatura = Table(assinatura_data, colWidths=[267, 268])
     t_assinatura.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
         ('LEFTPADDING', (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(t_assinatura)
     
+    # 6. Inclusão das Fotos dos Pneus no Final do PDF (se houver imagem associada)
+    imagens_pneu = pneu.get('imagens_bytes', [])
+    if imagens_pneu:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("<b>Registro Fotográfico do Pneu:</b>", style_section_title))
+        story.append(Spacer(1, 5))
+        
+        img_table_data = []
+        linha_atual = []
+        for img_bytes in imagens_pneu[:4]: # Limita até 4 fotos para caber bem na página
+            try:
+                img_io = io.BytesIO(img_bytes)
+                rl_img = RLImage(img_io, width=120, height=90)
+                linha_atual.append(rl_img)
+                if len(linha_atual) == 2:
+                    img_table_data.append(linha_atual)
+                    linha_atual = []
+            except Exception:
+                pass
+        if linha_atual:
+            while len(linha_atual) < 2:
+                linha_atual.append("")
+            img_table_data.append(linha_atual)
+            
+        if img_table_data:
+            t_fotos = Table(img_table_data, colWidths=[267, 268])
+            t_fotos.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ]))
+            story.append(t_fotos)
+
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
