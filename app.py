@@ -103,7 +103,7 @@ st.markdown("""
 # ---------------------------------------------------------
 # 3. CABEÇALHO: LOGO DA BÚSSOLA + TÍTULO
 # ---------------------------------------------------------
-col_logo, col_header = st.columns([1, 8], vertical_alignment="center")
+col_logo, col_header = st.columns([2, 8], vertical_alignment="center")
 
 with col_logo:
     if os.path.exists("ssasdsds.png"):
