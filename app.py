@@ -1,23 +1,25 @@
 import os
+import datetime
 import streamlit as st
 import pandas as pd
 
 # Importação dos módulos customizados do projeto
 try:
     from parser import parse_html_report
-except ImportError:
+except Exception as e:
     parse_html_report = None
+    st.error(f"⚠️ Erro ao importar parser.py: {e}")
 
 try:
     from ai_helper import process_images_with_ai
-except ImportError:
+except Exception as e:
     process_images_with_ai = None
 
 try:
     from pdf_generator import gerar_pdf_laudo
-except ImportError as e:
+except Exception as e:
     gerar_pdf_laudo = None
-    st.error(f"Erro ao importar pdf_generator: {e}")
+    st.error(f"⚠️ Erro ao importar pdf_generator.py: {e}")
 
 
 # ---------------------------------------------------------
@@ -104,13 +106,13 @@ st.markdown("""
 # ---------------------------------------------------------
 # 3. CABEÇALHO: LOGO DA BÚSSOLA + TÍTULO
 # ---------------------------------------------------------
-col_logo, col_header = st.columns([2, 8], vertical_alignment="center")
+col_logo, col_header = st.columns([1.5, 8.5], vertical_alignment="center")
 
 with col_logo:
     if os.path.exists("ssasdsds.png"):
-        st.image("ssasdsds.png", width=220)
+        st.image("ssasdsds.png", width=140)
     elif os.path.exists("logo-nobg.png"):
-        st.image("logo-nobg.png", width=220)
+        st.image("logo-nobg.png", width=140)
     else:
         st.write("🧭")
 
@@ -120,12 +122,18 @@ with col_header:
 
 st.markdown("---")
 
+
+# ---------------------------------------------------------
+# MEMÓRIA DE SESSÃO DO STREAMLIT (SESSION STATE)
+# ---------------------------------------------------------
+if "df_dados" not in st.session_state:
+    st.session_state["df_dados"] = None
+
+
 # ---------------------------------------------------------
 # 4. UPLOADS LADO A LADO (COMPACTOS)
 # ---------------------------------------------------------
 col_html, col_imgs = st.columns(2, gap="large")
-
-df_dados = None
 
 with col_html:
     st.markdown("### 📄 1. Relatório de Troca (HTML)")
@@ -136,22 +144,37 @@ with col_html:
     )
 
     if uploaded_html is not None:
-        if parse_html_report:
-            try:
-                # Força o reset da leitura do arquivo para evitar que venha vazio
-                uploaded_html.seek(0)
-                df_dados = parse_html_report(uploaded_html)
+        if parse_html_report is not None:
+            # Processa o HTML apenas se ainda não está guardado na sessão
+            if st.session_state["df_dados"] is None:
+                try:
+                    uploaded_html.seek(0)
+                    resultado = parse_html_report(uploaded_html)
+                    
+                    if resultado is not None and len(resultado) > 0:
+                        st.session_state["df_dados"] = resultado
+                    else:
+                        st.error("⚠️ O arquivo HTML foi recebido, mas a função `parse_html_report` não encontrou dados de pneus nele.")
+                except Exception as e:
+                    st.error(f"Erro ao processar o arquivo HTML: {e}")
+
+            # Se já temos dados na memória
+            if st.session_state["df_dados"] is not None:
+                df_temp = st.session_state["df_dados"]
+                qtd = len(df_temp) if hasattr(df_temp, "__len__") else 0
+                st.success(f"✅ {qtd} pneus extraídos com sucesso.")
                 
-                if df_dados is not None and len(df_dados) > 0:
-                    st.success(f"✅ {len(df_dados)} pneus extraídos do relatório.")
-                    with st.expander("📋 Ver / editar dados extraídos do relatório"):
-                        df_dados = st.data_editor(df_dados, num_rows="dynamic", use_container_width=True)
-                else:
-                    st.warning("⚠️ Não foi possível extrair dados do relatório HTML.")
-            except Exception as e:
-                st.error(f"Erro ao processar arquivo HTML: {e}")
+                with st.expander("📋 Ver / editar dados extraídos do relatório"):
+                    if isinstance(df_temp, pd.DataFrame):
+                        # Permite edição visual e atualiza a sessão
+                        st.session_state["df_dados"] = st.data_editor(df_temp, num_rows="dynamic", use_container_width=True)
+                    else:
+                        st.write(df_temp)
         else:
-            st.success("✅ Arquivo HTML recebido com sucesso!")
+            st.error("⚠️ A função `parse_html_report` não está disponível. Verifique o `parser.py`.")
+    else:
+        # Se o usuário remover o arquivo, limpa a sessão
+        st.session_state["df_dados"] = None
 
 with col_imgs:
     st.markdown("### 📸 2. Fotos dos Pneus")
@@ -174,7 +197,9 @@ c1, c2, c3 = st.columns([1, 2, 1])
 
 with c2:
     if st.button("🚀 GERAR LAUDO EM PDF", use_container_width=True):
-        if uploaded_html is None or df_dados is None:
+        df_dados_atual = st.session_state.get("df_dados")
+
+        if uploaded_html is None or df_dados_atual is None:
             st.warning("⚠️ Por favor, envie um relatório HTML válido antes de continuar.")
         elif not uploaded_images:
             st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
@@ -184,16 +209,15 @@ with c2:
                     if gerar_pdf_laudo is not None:
                         timestamp_atual = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-                        # Converte DataFrame para lista de dicionários exigida pelo PDF Generator
-                        if isinstance(df_dados, pd.DataFrame):
-                            pneus_input = df_dados.to_dict(orient="records")
+                        # Converte DataFrame para lista de dicionários se necessário
+                        if isinstance(df_dados_atual, pd.DataFrame):
+                            pneus_input = df_dados_atual.to_dict(orient="records")
                         else:
-                            pneus_input = df_dados
+                            pneus_input = df_dados_atual
 
                         if not pneus_input:
-                            st.error("⚠️ Nenhum dado de pneu encontrado para gerar o PDF.")
+                            st.error("⚠️ Nenhum dado de pneu válido encontrado para gerar o PDF.")
                         else:
-                            # Chamada da função com tratamento de dados
                             pdf_bytes = gerar_pdf_laudo(pneus_input, timestamp_atual)
 
                             st.success("🎉 Laudo em PDF gerado com sucesso!")
@@ -205,7 +229,7 @@ with c2:
                                 use_container_width=True
                             )
                     else:
-                        st.error("A função `gerar_pdf_laudo` não está carregada corretamente.")
+                        st.error("A função `gerar_pdf_laudo` não está carregada corretamente. Verifique o `pdf_generator.py`.")
 
                 except Exception as e:
                     st.error(f"Ocorreu um erro ao gerar o laudo: {e}")
