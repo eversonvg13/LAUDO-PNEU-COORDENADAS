@@ -31,8 +31,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'HeaderTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=20,  # Era 11
-        leading=16,   # Era 14
+        fontSize=14,  # Era 11
+        leading=14,   # Era 14
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
     )
@@ -105,13 +105,68 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             img_logo = RLImage(logo_path, width=95, height=32)
         
         img_logo.hAlign = 'LEFT'
+      # Criar um estilo específico e independente para o "Laudo de Pneus"
+    style_header_sub = ParagraphStyle(
+        'HeaderSub',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=12,  # <-- Altere aqui o tamanho do "Laudo de Pneus" livremente (ex: 12, 13, 14...)
+        leading=15,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#000000')
+    )
+
+    # 1. Cabeçalho com Logo (Com alta resolução via LANCZOS para evitar pixelação)
+    logo_path = None
+    for nome_img in ["ssasdsds.png", "logo-nobg.png", "logo.png"]:
+        if os.path.exists(nome_img):
+            logo_path = nome_img
+            break
+            
+    if logo_path:
+        try:
+            with PILImage.open(logo_path) as pil_img:
+                orig_w, orig_h = pil_img.size
+                desired_w = 95  # Largura de exibição
+                desired_h = (orig_h * desired_w) / orig_w  # Altura proporcional
+                
+                # Upscaling de alta qualidade para o PDF renderizar nítido
+                scale_factor = 3
+                high_res_img = pil_img.resize(
+                    (int(desired_w * scale_factor), int(desired_h * scale_factor)), 
+                    PILImage.Resampling.LANCZOS
+                )
+                
+                logo_io = io.BytesIO()
+                high_res_img.save(logo_io, format='PNG', optimize=True)
+                logo_io.seek(0)
+                
+                img_logo = RLImage(logo_io, width=desired_w, height=desired_h)
+        except Exception:
+            img_logo = RLImage(logo_path, width=95, height=32)
+        
+        img_logo.hAlign = 'LEFT'
+        
+        # Conteúdo centralizado separado em dois elementos distintos
+        bloco_titulo_central = [
+            Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title),
+            Spacer(1, 2),
+            Paragraph("Laudo de Pneus", style_header_sub)
+        ]
+        
         header_table_data = [
-            [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b><br/><font size=10>Laudo de Pneus</font>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
+            [img_logo, bloco_titulo_central, Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
         ]
         t_header = Table(header_table_data, colWidths=[120, 325, 115])
     else:
+        bloco_titulo_central = [
+            Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title),
+            Spacer(1, 2),
+            Paragraph("Laudo de Pneus", style_header_sub)
+        ]
+        
         header_table_data = [
-            [Paragraph("<b>COORDENADAS</b>", style_header_title), Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b><br/><font size=14>Laudo de Pneus</font>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
+            [Paragraph("<b>COORDENADAS</b>", style_header_title), bloco_titulo_central, Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
         ]
         t_header = Table(header_table_data, colWidths=[120, 325, 115])
         
