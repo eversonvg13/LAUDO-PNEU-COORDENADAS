@@ -31,8 +31,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'HeaderTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=14,
+        fontSize=13,  # Era 11
+        leading=16,   # Era 14
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
     )
@@ -41,8 +41,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'CellValue',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8,
-        leading=10,
+        fontSize=10,  # Era 8
+        leading=12,   # Era 10
         textColor=colors.HexColor('#000000')
     )
     
@@ -50,8 +50,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'SectionTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
+        fontSize=10.5, # Era 8.5
+        leading=13,    # Era 11
         textColor=colors.HexColor('#000000')
     )
     
@@ -59,8 +59,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'SectionBody',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=12,
+        fontSize=11,   # Era 9
+        leading=14,    # Era 12
         textColor=colors.HexColor('#000000')
     )
 
@@ -68,11 +68,11 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'GaragemLines',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=7.5,
-        leading=9.5,
+        fontSize=9.5,  # Era 7.5
+        leading=11.5,  # Era 9.5
         textColor=colors.HexColor('#999999')
     )
-    
+
     story = []
     
     # 1. Cabeçalho com Logo (Com alta resolução via LANCZOS para evitar pixelação)
@@ -106,12 +106,12 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         
         img_logo.hAlign = 'LEFT'
         header_table_data = [
-            [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
+            [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
         ]
         t_header = Table(header_table_data, colWidths=[120, 325, 115])
     else:
         header_table_data = [
-            [Paragraph("<b>COORDENADAS</b>", style_header_title), Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
+            [Paragraph("<b>COORDENADAS</b>", style_header_title), Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
         ]
         t_header = Table(header_table_data, colWidths=[120, 325, 115])
         
@@ -189,7 +189,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         [Paragraph(f"<b>Dano causado:</b> {danos}", style_section_body)],
         [Paragraph(f"<b>Causas prováveis:</b> {causas}", style_section_body)],
         [Paragraph(f"<b>Observações:</b> {obs}", style_section_body)],
-        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=7 color='#333333'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Enc. Borracharia</font>", style_section_body)]
+        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=9 color='#333333'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Enc. Borracharia</font>", style_section_body)]
     ]
     
     t_secoes = Table(secoes_data, colWidths=[560])
