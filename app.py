@@ -293,6 +293,17 @@ with st.container(border=True):
                             texto_causa = "-"
                             texto_acao = "Acompanhamento de rotina."
 
+                        # Converte as imagens enviadas para bytes para incluir no PDF
+                        imagens_bytes_list = []
+                        if "Imagens" in res and res["Imagens"]:
+                            for img_file in res["Imagens"]:
+                                try:
+                                    # Garante que o ponteiro do arquivo está no início
+                                    img_file.seek(0)
+                                    imagens_bytes_list.append(img_file.getvalue())
+                                except Exception:
+                                    pass
+
                         pneu = {
                             "fogo": fogo_lido,
                             "pos": dados_tabela.get("POS", "") if dados_tabela else "",
@@ -311,6 +322,7 @@ with st.container(border=True):
                             "acao_recomendada": texto_acao,
                             "confianca": item.get("confianca", ""),
                             "fogo_localizado_na_planilha": dados_tabela is not None,
+                            "imagens_bytes": imagens_bytes_list,  # <--- CHAVE ADICIONADA PARA AS FOTOS
                         }
                         pneus_estruturados.append(pneu)
                 except Exception as e:
