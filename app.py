@@ -5,6 +5,15 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
+# Adicione isso logo após as importações iniciais
+@st.cache_data(show_spinner=False)
+def gerar_pdf_em_cache(pneu_dict, data_str):
+    """
+    Gera o PDF apenas uma vez por pneu e guarda na memória.
+    Evita recriar o arquivo a cada atualização de tela.
+    """
+    return gerar_pdf_laudo_pneu(pneu_dict, data_str)
+
 # Importações dos nossos módulos locais
 from parser import parse_relatorio_html, CAMPOS_FIXOS
 from ai_helper import (
@@ -360,8 +369,8 @@ if st.session_state.get("inspection_results"):
                         st.write(f"**Laudo / Dano Relatado:** {pneu.get('danos', '')}")
                         st.write(f"**Ação Recomendada:** {pneu.get('acao_recomendada', '')}")
 
-                        # Botão de download INDIVIDUAL para cada pneu
-                        pdf_pneu_bytes = gerar_pdf_laudo_pneu(pneu, res["Timestamp"].split()[0])
+                        # Botão de download INDIVIDUAL para cada pneu usando CACHE
+                        pdf_pneu_bytes = gerar_pdf_em_cache(pneu, res["Timestamp"].split()[0])
                         st.download_button(
                             label=f"📄 Baixar PDF - Pneu {fogo_num}",
                             data=pdf_pneu_bytes,
