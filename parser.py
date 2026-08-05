@@ -78,6 +78,7 @@ def parse_relatorio_html(file_bytes):
                         "VEICULO": veiculo_atual,
                         "POS": cols[1],
                         "FOGO": cols[2],
+                        "n_reformas": cols[2],
                         "MEDIDA": cols[3],
                         "RETIRADA": cols[4],
                         "LOCAL": cols[5],
