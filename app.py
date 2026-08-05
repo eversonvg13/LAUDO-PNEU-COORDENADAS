@@ -1,4 +1,5 @@
 import os
+import base64
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -13,6 +14,16 @@ from ai_helper import (
     extrair_json_da_resposta,
 )
 from pdf_generator import gerar_pdf_laudo, gerar_pdf_fallback
+
+# Função auxiliar para converter imagem em base64 (centralização perfeita via HTML)
+def get_image_base64(path):
+    if os.path.exists(path):
+        try:
+            with open(path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
+        except Exception:
+            return None
+    return None
 
 # ==============================================================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -47,7 +58,7 @@ st.markdown("""
         color: #ffffff;
     }
 
-    /* Remove padding superior padrão do Streamlit para o cabeçalho ficar colado no topo */
+    /* Remove padding superior padrão do Streamlit para o cabeçalho ficar alinhado */
     .block-container {
         padding-top: 2rem !important;
     }
@@ -73,7 +84,7 @@ st.markdown("""
         border-radius: 6px;
         font-weight: 600;
         font-size: 16px;
-        background-color: #f07b82; /* Cor similar a da imagem */
+        background-color: #f07b82;
         color: white;
         border: none;
         padding: 10px;
@@ -83,7 +94,6 @@ st.markdown("""
         color: white;
     }
 
-    /* Esconder headers padrão para usar os customizados */
     .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         color: #ffffff !important;
     }
@@ -94,21 +104,21 @@ st.markdown("""
 api_key = os.environ.get("GEMINI_API_KEY", "") or st.secrets.get("GEMINI_API_KEY", "")
 
 # ==============================================================================
-# CABEÇALHO (LOGO + TÍTULO + LINHA VERMELHA)
+# CABEÇALHO CENTRALIZADO COM LOGO MAIOR
 # ==============================================================================
-col_logo, col_titulo = st.columns([1, 11])
+logo_b64 = get_image_base64("ssasdsds.png") or get_image_base64("logo-nobg.png")
 
-with col_logo:
-    if os.path.exists("ssasdsds.png"):
-        st.image("ssasdsds.png", width=80)
-    elif os.path.exists("logo-nobg.png"):
-        st.image("logo-nobg.png", width=80)
-    else:
-        st.markdown("<h1 style='font-size: 50px; margin: 0; padding: 0;'>🧭</h1>", unsafe_allow_html=True)
+if logo_b64:
+    logo_img_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 110px; object-fit: contain; margin-right: 20px;">'
+else:
+    logo_img_html = '<span style="font-size: 70px; margin-right: 20px;">🧭</span>'
 
-with col_titulo:
-    # Ajuste de margem para alinhar o texto verticalmente com a imagem
-    st.markdown("<h1 style='margin-top: 15px; font-weight: 900; font-size: 32px;'>LAUDO PNEUS COORDENADAS</h1>", unsafe_allow_html=True)
+st.markdown(f"""
+    <div style="display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 10px; margin-bottom: 10px;">
+        {logo_img_html}
+        <h1 style="margin: 0; font-weight: 900; font-size: 36px; color: #ffffff; text-align: center;">LAUDO PNEUS COORDENADAS</h1>
+    </div>
+""", unsafe_allow_html=True)
 
 # Linha vermelha forte dividindo o cabeçalho
 st.markdown('<hr style="border: none; height: 3px; background-color: #dc2626; margin-top: 15px; margin-bottom: 10px;">', unsafe_allow_html=True)
@@ -119,11 +129,10 @@ st.markdown("<p style='text-align: center; color: #a1a1aa; font-size: 16px; marg
 # ==============================================================================
 # SEÇÃO 1: RELATÓRIO E FOTOS (TÍTULO E CARDS)
 # ==============================================================================
-# Título com o quadrado azul do número 1
 st.markdown("""
     <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 15px;'>
         <div style='background-color: #025ca3; color: white; font-weight: bold; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px;'>1</div>
-        <h3 style='margin: 0; padding: 0; font-size: 24px;'>Relatório e Fotos</h3>
+        <h3 style='margin: 0; padding: 0; font-size: 24px; color: #ffffff;'>Relatório e Fotos</h3>
     </div>
 """, unsafe_allow_html=True)
 
@@ -132,7 +141,7 @@ col1, col2 = st.columns(2)
 # --- CARD 1: RELATÓRIO HTML ---
 with col1:
     with st.container(border=True):
-        st.markdown("<h4 style='color: #ef4444; margin-top: 0;'><span style='font-size: 18px;'>📄</span> Relatório HTML</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #ffffff; margin-top: 0;'><span style='font-size: 18px;'>📄</span> Relatório HTML</h4>", unsafe_allow_html=True)
         st.caption("Envie o relatório exportado em HTML (Relatório de Troca de Pneus - Modelo 4)")
         
         relatorio_file = st.file_uploader(
@@ -140,7 +149,7 @@ with col1:
             type=["html", "htm"],
             accept_multiple_files=False,
             key="uploader_html",
-            label_visibility="collapsed" # Esconde o label padrão para ficar limpo
+            label_visibility="collapsed"
         )
 
         if relatorio_file is not None:
@@ -156,7 +165,7 @@ with col1:
 # --- CARD 2: FOTOS DOS PNEUS ---
 with col2:
     with st.container(border=True):
-        st.markdown("<h4 style='color: #ef4444; margin-top: 0;'><span style='font-size: 18px;'>🖼️</span> Fotos dos Pneus</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #ffffff; margin-top: 0;'><span style='font-size: 18px;'>🖼️</span> Fotos dos Pneus</h4>", unsafe_allow_html=True)
         st.caption("Envie o lote completo de fotos dos pneus (JPG, PNG)")
         
         uploaded_files = st.file_uploader(
@@ -179,7 +188,6 @@ with col2:
 # ==============================================================================
 # VISUALIZAÇÃO DOS DADOS DO RELATÓRIO (EXPANDER OPCIONAL)
 # ==============================================================================
-# Se a planilha foi lida, exibe fora dos cards para não quebrar o layout visual
 if "dados_relatorio" not in st.session_state:
     st.session_state.dados_relatorio = pd.DataFrame(columns=CAMPOS_FIXOS)
 
@@ -311,7 +319,7 @@ if st.session_state.get("inspection_results"):
     st.markdown("""
         <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 15px;'>
             <div style='background-color: #025ca3; color: white; font-weight: bold; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px;'>2</div>
-            <h3 style='margin: 0; padding: 0; font-size: 24px;'>Laudo Consolidado</h3>
+            <h3 style='margin: 0; padding: 0; font-size: 24px; color: #ffffff;'>Laudo Consolidado</h3>
         </div>
     """, unsafe_allow_html=True)
 
