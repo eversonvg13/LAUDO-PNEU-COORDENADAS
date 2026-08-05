@@ -1,5 +1,6 @@
 import os
 import base64
+import time
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -265,8 +266,29 @@ with st.container(border=True):
                     conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
                 conteudo_requisicao.append(prompt_instrucoes)
 
-                texto_status.info(f"Processando análise visual ({nome_modelo_ativo})...")
-                resposta_ia = model.generate_content(conteudo_requisicao)
+                # Tratamento robusto para o erro 429 (Quota Excedida) com loop de retry automático
+                max_tentativas = 3
+                tentativa = 0
+                sucesso = False
+                resposta_ia = None
+
+                while tentativa < max_tentativas and not sucesso:
+                    try:
+                        texto_status.info(f"Processando análise visual ({nome_modelo_ativo}) [Tentativa {tentativa+1}/{max_tentativas}]...")
+                        resposta_ia = model.generate_content(conteudo_requisicao)
+                        sucesso = True
+                    except Exception as e:
+                        erro_str = str(e)
+                        if "429" in erro_str or "ResourceExhausted" in type(e).__name__ or "quota" in erro_str.lower():
+                            tentativa += 1
+                            if tentativa < max_tentativas:
+                                tempo_espera = 15 * tentativa
+                                texto_status.warning(f"⚠️ Limite de cota excedido (Erro 429). Aguardando {tempo_espera}s para tentar novamente de forma automática...")
+                                time.sleep(tempo_espera)
+                            else:
+                                raise RuntimeError(f"Limite de cota da API do Gemini excedido (Erro 429). Aguarde alguns segundos e tente novamente. Detalhes: {e}")
+                        else:
+                            raise e
 
                 pneus_estruturados = None
                 erro_parse = None
