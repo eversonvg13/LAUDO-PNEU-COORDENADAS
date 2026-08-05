@@ -99,7 +99,14 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     unidade = pneu.get('local', '') or '-'
     fogo = str(pneu.get('fogo', ''))
     veiculo = str(pneu.get('veiculo', ''))
-    medida = str(pneu.get('medida', ''))
+    
+    # Tratamento para exibir apenas a medida limpa (ex: remove prefixos como "002-")
+    medida_raw = str(pneu.get('medida', ''))
+    if '-' in medida_raw:
+        medida = medida_raw.split('-')[-1].strip()
+    else:
+        medida = medida_raw.strip()
+
     posicao = str(pneu.get('pos', ''))
     km_pos = str(pneu.get('km_pos', ''))
     retirada = str(pneu.get('retirada', ''))
@@ -168,7 +175,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(t_secoes)
     story.append(Spacer(1, 4))
     
-    # 4. Bloco da Garagem Ampliado (Espaço maior com linhas pautadas)
+    # 4. Bloco da Garagem Ampliado
     linhas_pautadas = "<br/>".join(["____________________________________________________________________________________"] * 6)
     espaco_garagem_data = [
         [Paragraph("<b>Resposta da Garagem (Defeitos encontrados no veículo / Ações executadas):</b>", style_section_title)],
@@ -187,7 +194,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(t_garagem)
     story.append(Spacer(1, 4))
     
-    # 5. Assinatura Apenas do Coordenador de Manutenção
+    # 5. Assinatura Coordenador de Manutenção
     assinatura_data = [
         [Paragraph("<b>Visto Coordenador de Manutenção:</b> __________________________________________________", style_cell_value)]
     ]
@@ -202,7 +209,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     ]))
     story.append(t_assinatura)
     
-    # 6. Fotos Apenas do Pneu Específico
+    # 6. Fotos Específicas do Pneu
     imagens_pneu = pneu.get('imagens_bytes', [])
     if imagens_pneu:
         story.append(Spacer(1, 8))
