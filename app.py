@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
-# Adicione esta função perto do topo, logo após os "imports"
+# Função para carregar a planilha com a Categoria (Flanco/Banda)
 @st.cache_data(show_spinner=False)
 def carregar_tabela_fvu():
     """Lê a planilha local e extrai os padrões de laudo (aba FVU)."""
@@ -17,6 +17,7 @@ def carregar_tabela_fvu():
         for _, row in df_fvu.iterrows():
             lista_fvu.append({
                 "codigo": str(row['FVU']).strip(),
+                "categoria": "" if pd.isna(row.get('CATEGORIA')) else str(row['CATEGORIA']).strip(),
                 "descricao": "" if pd.isna(row['DESCRIÇÃO']) else str(row['DESCRIÇÃO']).strip(),
                 "causa": "" if pd.isna(row['CAUSA']) else str(row['CAUSA']).strip(),
                 "acao": "" if pd.isna(row['AÇÃO']) else str(row['AÇÃO']).strip()
@@ -30,16 +31,13 @@ def carregar_tabela_fvu():
 if "fvu_data" not in st.session_state:
     st.session_state.fvu_data = carregar_tabela_fvu()
     
-# Adicione isso logo após as importações iniciais
+# Cache para geração de PDF
 @st.cache_data(show_spinner=False)
 def gerar_pdf_em_cache(pneu_dict, data_str):
-    """
-    Gera o PDF apenas uma vez por pneu e guarda na memória.
-    Evita recriar o arquivo a cada atualização de tela.
-    """
+    """Gera o PDF apenas uma vez por pneu e guarda na memória."""
     return gerar_pdf_laudo_pneu(pneu_dict, data_str)
 
-# Importações dos nossos módulos locais
+# Importações dos módulos locais
 from parser import parse_relatorio_html, CAMPOS_FIXOS
 from ai_helper import (
     comprimir_imagem,
@@ -49,7 +47,7 @@ from ai_helper import (
 )
 from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
 
-# Função auxiliar para converter imagem em base64 (centralização perfeita via HTML)
+# Função auxiliar para converter imagem em base64
 def get_image_base64(path):
     if os.path.exists(path):
         try:
@@ -81,38 +79,27 @@ st.set_page_config(
 # ==============================================================================
 st.markdown("""
     <style>
-    /* Ocultar Barra Lateral e Controle de Expandir/Recolher */
     [data-testid="stSidebar"], [data-testid="collapsedControl"] {
         display: none !important;
     }
-
-    /* Fundo Escuro da Aplicação */
     .stApp, .main {
         background-color: #0d1117;
         color: #ffffff;
     }
-
-    /* Remove padding superior padrão do Streamlit para o cabeçalho ficar alinhado */
     .block-container {
         padding-top: 2rem !important;
     }
-
-    /* Customização dos contêineres (Cards) para o tema escuro */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #161b22;
         border-radius: 10px;
         border: 1px solid #30363d;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
     }
-    
-    /* Estilo da área de arrastar e soltar (Uploader) */
     [data-testid="stFileUploadDropzone"] {
         background-color: #0d1117;
         border: 1px dashed #4b5563;
         border-radius: 8px;
     }
-
-    /* Estilização do Botão Principal (Rosa/Vermelho claro do print) */
     div.stButton > button:first-child {
         width: 100%;
         border-radius: 6px;
@@ -127,14 +114,13 @@ st.markdown("""
         background-color: #dc2626;
         color: white;
     }
-
     .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         color: #ffffff !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Obtenção da chave de API em segundo plano (via Variável de Ambiente ou Secrets)
+# Obtenção da chave de API
 api_key = os.environ.get("GEMINI_API_KEY", "") or st.secrets.get("GEMINI_API_KEY", "")
 
 # ==============================================================================
@@ -154,14 +140,11 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# Linha vermelha forte dividindo o cabeçalho
 st.markdown('<hr style="border: none; height: 3px; background-color: #dc2626; margin-top: 15px; margin-bottom: 10px;">', unsafe_allow_html=True)
-
-# Texto de Fluxo Centralizado
 st.markdown("<p style='text-align: center; color: #a1a1aa; font-size: 16px; margin-bottom: 40px;'>Fluxo: <b>1)</b> Envie o relatório e as fotos &nbsp;➔&nbsp; <b>2)</b> Gere o laudo em PDF</p>", unsafe_allow_html=True)
 
 # ==============================================================================
-# SEÇÃO 1: RELATÓRIO E FOTOS (TÍTULO E CARDS)
+# SEÇÃO 1: RELATÓRIO E FOTOS
 # ==============================================================================
 st.markdown("""
     <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 15px;'>
@@ -172,7 +155,6 @@ st.markdown("""
 
 col1, col2 = st.columns(2)
 
-# --- CARD 1: RELATÓRIO HTML ---
 with col1:
     with st.container(border=True):
         st.markdown("<h4 style='color: #ffffff; margin-top: 0;'><span style='font-size: 18px;'>📄</span> Relatório HTML</h4>", unsafe_allow_html=True)
@@ -196,7 +178,6 @@ with col1:
                     except Exception as e:
                         st.error(f"Erro: {e}")
 
-# --- CARD 2: FOTOS DOS PNEUS ---
 with col2:
     with st.container(border=True):
         st.markdown("<h4 style='color: #ffffff; margin-top: 0;'><span style='font-size: 18px;'>🖼️</span> Fotos dos Pneus</h4>", unsafe_allow_html=True)
@@ -219,9 +200,6 @@ with col2:
             ]
         )
 
-# ==============================================================================
-# VISUALIZAÇÃO DOS DADOS DO RELATÓRIO (EXPANDER OPCIONAL)
-# ==============================================================================
 if "dados_relatorio" not in st.session_state:
     st.session_state.dados_relatorio = pd.DataFrame(columns=CAMPOS_FIXOS)
 
@@ -235,7 +213,7 @@ if not st.session_state.dados_relatorio.empty:
         )
 
 # ==============================================================================
-# SEÇÃO DO BOTÃO PRINCIPAL (CARD INFERIOR)
+# SEÇÃO DO BOTÃO PRINCIPAL
 # ==============================================================================
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -254,30 +232,30 @@ with st.container(border=True):
                 genai.configure(api_key=api_key)
 
                 texto_status = st.empty()
-                texto_status.info("Conectando ao modelo da IA e lendo planilha de classificação...")
+                texto_status.info("Conectando ao agente de IA e lendo planilha de classificação...")
 
                 # 1. Carrega os padrões FVU
                 fvu_data = carregar_tabela_fvu()
                 
-                # 2. Monta o texto de opções para a IA ler
-                fvu_opcoes_prompt = "CLASSIFICAÇÃO DE DANOS (TABELA FVU):\n"
+                # 2. Guia de Treinamento do Agente com Categoria e Causas
+                fvu_opcoes_prompt = "GUIA DE TREINAMENTO (TABELA FVU):\n"
                 for item in fvu_data:
-                    fvu_opcoes_prompt += f"- CÓDIGO: {item['codigo']} | DANO: {item['descricao']}\n"
+                    fvu_opcoes_prompt += f"- CÓDIGO: {item['codigo']} | LOCAL: {item['categoria']} | DANO: {item['descricao']} | SINAIS: {item['causa']}\n"
 
                 nome_modelo_ativo = obter_modelo_estavel(genai)
                 model = genai.GenerativeModel(nome_modelo_ativo)
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
-                # 3. Novo prompt forçando o uso dos códigos
+                # 3. Prompt do Agente Especialista
                 prompt_instrucoes = f"""
-                Você é um inspetor especialista em inventário de pneus de frota (SMART-LOG).
-                Abaixo estão {len(sorted_files)} fotos ordenadas cronologicamente.
+                Você é um Agente Especialista em Laudos Técnicos de Pneus de Frota Pesada.
+                Abaixo estão {len(sorted_files)} fotos ordenadas. Cada pneu começa com a foto do 'Fogo' (número escrito a giz).
 
-                Sua tarefa:
-                1. Analise as imagens e agrupe-as por pneu individual.
-                2. Leia o número de Fogo exatamente como aparece na foto.
-                3. OBRIGATÓRIO: Baseado no dano visual encontrado na banda/flanco, classifique o problema escolhendo um dos seguintes Códigos FVU:
-                
+                SEU RACIOCÍNIO OBRIGATÓRIO PARA CADA PNEU:
+                A. Verifique visualmente a região do dano: Está na BANDA DE RODAGEM (superfície de contato) ou no FLANCO (lateral)?
+                B. Compare os sinais visuais da avaria com a seção "SINAIS" e "LOCAL" do guia abaixo.
+                C. Determine o CÓDIGO exato que melhor descreve o dano.
+
                 {fvu_opcoes_prompt}
 
                 Se o pneu não possuir avarias severas, use o código "OK".
@@ -288,7 +266,7 @@ with st.container(border=True):
                     "fogo": "string",
                     "marca": "string",
                     "sulco": "string",
-                    "codigo_fvu": "string (Retorne APENAS o código, ex: 45D, 71k, etc)",
+                    "codigo_fvu": "string (Retorne APENAS o código, ex: 45D, 71k)",
                     "confianca": "Alta | Média | Baixa"
                   }}
                 ]
@@ -301,7 +279,7 @@ with st.container(border=True):
                     conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
                 conteudo_requisicao.append(prompt_instrucoes)
 
-                texto_status.info(f"Enviando fotos e parâmetros FVU para a IA ({nome_modelo_ativo})...")
+                texto_status.info(f"Enviando fotos e parâmetros para o Agente IA ({nome_modelo_ativo})...")
                 resposta_ia = model.generate_content(conteudo_requisicao)
 
                 pneus_estruturados = None
@@ -315,10 +293,7 @@ with st.container(border=True):
                         fogo_lido = str(item.get("fogo", "")).strip()
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
                         
-                        # 4. Lê o código que a IA escolheu
                         codigo_ia = str(item.get("codigo_fvu", "")).strip()
-                        
-                        # 5. Busca as frases completas correspondentes na planilha
                         fvu_selecionado = next((x for x in fvu_data if x['codigo'].lower() == codigo_ia.lower()), None)
                         
                         if fvu_selecionado:
@@ -326,7 +301,6 @@ with st.container(border=True):
                             texto_causa = fvu_selecionado["causa"]
                             texto_acao = fvu_selecionado["acao"]
                         else:
-                            # Caso a IA não consiga identificar ou retorne "OK"
                             texto_dano = "Sem avarias severas catalogadas."
                             texto_causa = "-"
                             texto_acao = "Acompanhamento de rotina. Calibração periódica e medição de sulco."
@@ -342,20 +316,17 @@ with st.container(border=True):
                             "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
                             "marca": item.get("marca", ""),
                             "sulco": item.get("sulco", ""),
-                            
-                            # 6. Injeta os dados padrões oficiais direto no Laudo!
                             "danos": texto_dano,
                             "causas_provaveis": texto_causa,
                             "observacoes": texto_acao,
                             "acao_recomendada": texto_acao,
-                            
                             "confianca": item.get("confianca", ""),
                             "fogo_localizado_na_planilha": dados_tabela is not None,
                         }
                         pneus_estruturados.append(pneu)
                 except Exception as e:
                     erro_parse = str(e)
-                            
+                        
                 st.session_state.inspection_results = [{
                     "Timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "Modelo_Usado": nome_modelo_ativo,
@@ -365,16 +336,13 @@ with st.container(border=True):
                     "Imagens": sorted_files
                 }]
 
-                texto_status.success(f"✅ Inspeção concluída com sucesso via {nome_modelo_ativo}!")
+                texto_status.success(f"✅ Inspeção concluída com sucesso via Agente IA!")
 
             except Exception as e:
                 st.error(f"Erro no processamento: {str(e)}")
 
-# Importe a função individual no topo do arquivo
-from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
-
 # ==============================================================================
-# EXIBIÇÃO DOS RESULTADOS (LAUDO CONSOLIDADO)
+# EXIBIÇÃO DOS RESULTADOS (LAUDO CONSOLIDADO COM CORREÇÃO INSTANTÂNEA)
 # ==============================================================================
 if st.session_state.get("inspection_results"):
     st.markdown("---")
@@ -408,7 +376,9 @@ if st.session_state.get("inspection_results"):
                     with st.container(border=True):
                         st.markdown(f"### 🛞 {titulo}")
                         
-                        # --- MENU DE CORREÇÃO DO FVU ---
+                        # --- Cópia temporária para atualização instantânea sem bug de rerun ---
+                        pneu_exibicao = pneu.copy()
+                        
                         if fvu_options:
                             current_code = pneu.get("codigo_fvu", "")
                             matching_index = 0
@@ -427,31 +397,32 @@ if st.session_state.get("inspection_results"):
                             novo_codigo = selected_fvu_label.split(" - ")[0]
                             novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
                             
-                            if novo_fvu_obj and novo_fvu_obj['codigo'] != current_code:
-                                pneu["codigo_fvu"] = novo_fvu_obj['codigo']
-                                pneu["danos"] = novo_fvu_obj['descricao']
-                                pneu["causas_provaveis"] = novo_fvu_obj['causa']
-                                pneu["observacoes"] = novo_fvu_obj['acao']
-                                pneu["acao_recomendada"] = novo_fvu_obj['acao']
-                                st.rerun()
+                            if novo_fvu_obj:
+                                pneu_exibicao["codigo_fvu"] = novo_fvu_obj['codigo']
+                                pneu_exibicao["danos"] = novo_fvu_obj['descricao']
+                                pneu_exibicao["causas_provaveis"] = novo_fvu_obj['causa']
+                                pneu_exibicao["observacoes"] = novo_fvu_obj['acao']
+                                pneu_exibicao["acao_recomendada"] = novo_fvu_obj['acao']
 
+                        # Exibição baseada em 'pneu_exibicao'
                         c1, c2 = st.columns(2)
                         with c1:
-                            st.write(f"**POS:** {pneu.get('pos', '')}")
-                            st.write(f"**VEÍCULO:** {pneu.get('veiculo', '')}")
-                            st.write(f"**MEDIDA:** {pneu.get('medida', '')}")
-                            st.write(f"**RETIRADA:** {pneu.get('retirada', '')}")
+                            st.write(f"**POS:** {pneu_exibicao.get('pos', '')}")
+                            st.write(f"**VEÍCULO:** {pneu_exibicao.get('veiculo', '')}")
+                            st.write(f"**MEDIDA:** {pneu_exibicao.get('medida', '')}")
+                            st.write(f"**RETIRADA:** {pneu_exibicao.get('retirada', '')}")
                         with c2:
-                            st.write(f"**LOCAL/UNIDADE:** {pneu.get('local', '')}")
-                            st.write(f"**KM POS:** {pneu.get('km_pos', '')}")
-                            st.write(f"**KM TOTAL:** {pneu.get('km_total', '')}")
-                            st.write(f"**Confiança IA:** {pneu.get('confianca', '')}")
+                            st.write(f"**LOCAL/UNIDADE:** {pneu_exibicao.get('local', '')}")
+                            st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
+                            st.write(f"**KM TOTAL:** {pneu_exibicao.get('km_total', '')}")
+                            st.write(f"**Confiança IA:** {pneu_exibicao.get('confianca', '')}")
 
-                        st.write(f"**Laudo / Dano Relatado:** {pneu.get('danos', '')}")
-                        st.write(f"**Causas Prováveis:** {pneu.get('causas_provaveis', '')}")
-                        st.write(f"**Observações / Ação:** {pneu.get('observacoes', '')}")
+                        st.write(f"**Laudo / Dano Relatado:** {pneu_exibicao.get('danos', '')}")
+                        st.write(f"**Causas Prováveis:** {pneu_exibicao.get('causas_provaveis', '')}")
+                        st.write(f"**Observações / Ação:** {pneu_exibicao.get('observacoes', '')}")
 
-                        pdf_pneu_bytes = gerar_pdf_em_cache(pneu, res["Timestamp"].split()[0])
+                        # Botão de download atualizado instantaneamente conforme o selectbox
+                        pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
                         st.download_button(
                             label=f"📄 Baixar PDF - Pneu {fogo_num}",
                             data=pdf_pneu_bytes,
