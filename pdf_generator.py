@@ -65,7 +65,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     
     story = []
     
-    # 1. Cabeçalho com Logo (Procurando a imagem da logo)
+    # 1. Cabeçalho com Logo
     logo_path = None
     for nome_img in ["ssasdsds.png", "logo-nobg.png", "logo.png"]:
         if os.path.exists(nome_img):
@@ -95,7 +95,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(t_header)
     story.append(Spacer(1, 4))
     
-    # 2. Grid de Informações (Padrão 4x3)
+    # 2. Grid de Informações
     unidade = pneu.get('local', '') or '-'
     fogo = str(pneu.get('fogo', ''))
     veiculo = str(pneu.get('veiculo', ''))
@@ -168,17 +168,18 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(t_secoes)
     story.append(Spacer(1, 4))
     
-    # 4. Bloco de Resposta da Garagem (Espaço pautado com linhas)
+    # 4. Bloco da Garagem Ampliado (Espaço maior com linhas pautadas)
+    linhas_pautadas = "<br/>".join(["____________________________________________________________________________________"] * 6)
     espaco_garagem_data = [
         [Paragraph("<b>Resposta da Garagem (Defeitos encontrados no veículo / Ações executadas):</b>", style_section_title)],
-        [Paragraph("<br/><br/><br/><br/><br/>", style_section_body)], # Espaço em branco com linhas
+        [Paragraph(f"<font color='#cccccc'>{linhas_pautadas}</font>", style_section_body)],
     ]
     t_garagem = Table(espaco_garagem_data, colWidths=[535])
     t_garagem.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
         ('LINEBELOW', (0,0), (0,0), 1, colors.HexColor('#000000')),
         ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
         ('LEFTPADDING', (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 6),
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#f9fafb')),
@@ -186,38 +187,34 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(t_garagem)
     story.append(Spacer(1, 4))
     
-    # 5. Assinaturas e Vistos (Líder + Coordenador de Manutenção)
+    # 5. Assinatura Apenas do Coordenador de Manutenção
     assinatura_data = [
-        [
-            Paragraph("<b>Visto líder de manutenção:</b> ________________________", style_cell_value),
-            Paragraph("<b>Visto Coordenador de Manutenção:</b> ________________________", style_cell_value)
-        ]
+        [Paragraph("<b>Visto Coordenador de Manutenção:</b> __________________________________________________", style_cell_value)]
     ]
-    t_assinatura = Table(assinatura_data, colWidths=[267, 268])
+    t_assinatura = Table(assinatura_data, colWidths=[535])
     t_assinatura.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
         ('LEFTPADDING', (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(t_assinatura)
     
-    # 6. Inclusão das Fotos dos Pneus no Final do PDF (se houver imagem associada)
+    # 6. Fotos Apenas do Pneu Específico
     imagens_pneu = pneu.get('imagens_bytes', [])
     if imagens_pneu:
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
         story.append(Paragraph("<b>Registro Fotográfico do Pneu:</b>", style_section_title))
-        story.append(Spacer(1, 5))
+        story.append(Spacer(1, 4))
         
         img_table_data = []
         linha_atual = []
-        for img_bytes in imagens_pneu[:4]: # Limita até 4 fotos para caber bem na página
+        for img_bytes in imagens_pneu:
             try:
                 img_io = io.BytesIO(img_bytes)
-                rl_img = RLImage(img_io, width=120, height=90)
+                rl_img = RLImage(img_io, width=150, height=110)
                 linha_atual.append(rl_img)
                 if len(linha_atual) == 2:
                     img_table_data.append(linha_atual)
