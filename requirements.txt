@@ -9,4 +9,3 @@ reportlab
 httpx
 google-generativeai
 pytesseract
-ultralytics
