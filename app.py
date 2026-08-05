@@ -4,8 +4,7 @@ import time
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-from PIL import Image
-from fvu_improvements 
+from PIL import Image 
 import montar_prompt_com_fvu, selecionar_fvu
 
 
