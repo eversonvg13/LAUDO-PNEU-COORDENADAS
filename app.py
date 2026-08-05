@@ -93,11 +93,8 @@ with col_titulo:
     st.markdown("<h1 style='margin-bottom: 0px; margin-top: -5px;'>LAUDO PNEUS COORDENADAS</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color: #8b949e; font-size: 15px;'>Fluxo: 1) Envie o relatório HTML &nbsp;➔&nbsp; 2) Envie as fotos &nbsp;➔&nbsp; 3) Gere o laudo em PDF</p>", unsafe_allow_html=True)
 
-# Configuração da API Key no topo (como a sidebar foi removida)
-with st.expander("🔑 Configurações / Chave de API Gemini", expanded=False):
-    api_key_input = st.text_input("Chave da API Gemini", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
-
-api_key = api_key_input or st.secrets.get("GEMINI_API_KEY", "")
+# Obtenção da chave de API em segundo plano (via Variável de Ambiente ou Secrets)
+api_key = os.environ.get("GEMINI_API_KEY", "") or st.secrets.get("GEMINI_API_KEY", "")
 
 st.markdown("---")
 
@@ -177,7 +174,7 @@ if st.button("🚀 GERAR LAUDO EM PDF", type="primary"):
     if not uploaded_files:
         st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
     elif not api_key:
-        st.error("⚠️ Por favor, insira sua chave da API Gemini nas configurações acima.")
+        st.error("⚠️ Chave de API do Gemini não configurada no servidor (GEMINI_API_KEY).")
     else:
         if "inspection_results" not in st.session_state:
             st.session_state.inspection_results = []
