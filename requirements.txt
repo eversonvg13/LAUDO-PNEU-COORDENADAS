@@ -9,4 +9,3 @@ reportlab
 httpx
 google-generativeai
 pytesseract
-starlette<0.40
