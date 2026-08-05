@@ -109,7 +109,7 @@ api_key = os.environ.get("GEMINI_API_KEY", "") or st.secrets.get("GEMINI_API_KEY
 logo_b64 = get_image_base64("ssasdsds.png") or get_image_base64("logo-nobg.png")
 
 if logo_b64:
-    logo_img_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 110px; object-fit: contain; margin-right: 20px;">'
+    logo_img_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 180px; object-fit: contain; margin-right: 20px;">'
 else:
     logo_img_html = '<span style="font-size: 70px; margin-right: 20px;">🧭</span>'
 
