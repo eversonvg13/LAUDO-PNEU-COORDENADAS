@@ -3,7 +3,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 # Campos fixos do laudo, na ordem exigida
-CAMPOS_FIXOS = ["FOGO", "POS", "VEICULO", "MEDIDA", "REFORMA", "RETIRADA", "LOCAL", "KM/POS", "KM TOTAL"]
+CAMPOS_FIXOS = ["FOGO", "POS", "VEICULO", "MEDIDA", "RETIRADA", "LOCAL", "KM/POS", "KM TOTAL", "REFORMA"]
 
 # Mapeamento de posição (left em px) -> nome da coluna
 COLUNAS_REFERENCIA = [
