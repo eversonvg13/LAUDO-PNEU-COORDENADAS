@@ -120,11 +120,12 @@ with col_header:
 
 st.markdown("---")
 
-
 # ---------------------------------------------------------
 # 4. UPLOADS LADO A LADO (COMPACTOS)
 # ---------------------------------------------------------
 col_html, col_imgs = st.columns(2, gap="large")
+
+df_dados = None
 
 with col_html:
     st.markdown("### 📄 1. Relatório de Troca (HTML)")
@@ -134,16 +135,19 @@ with col_html:
         key="html_uploader"
     )
 
-    df_dados = None
     if uploaded_html is not None:
         if parse_html_report:
             try:
+                # Força o reset da leitura do arquivo para evitar que venha vazio
+                uploaded_html.seek(0)
                 df_dados = parse_html_report(uploaded_html)
-                qtd_pneus = len(df_dados) if df_dados is not None else 0
-                st.success(f"✅ {qtd_pneus} pneus extraídos do relatório.")
                 
-                with st.expander("📋 Ver / editar dados extraídos do relatório"):
-                    df_dados = st.data_editor(df_dados, num_rows="dynamic", use_container_width=True)
+                if df_dados is not None and len(df_dados) > 0:
+                    st.success(f"✅ {len(df_dados)} pneus extraídos do relatório.")
+                    with st.expander("📋 Ver / editar dados extraídos do relatório"):
+                        df_dados = st.data_editor(df_dados, num_rows="dynamic", use_container_width=True)
+                else:
+                    st.warning("⚠️ Não foi possível extrair dados do relatório HTML.")
             except Exception as e:
                 st.error(f"Erro ao processar arquivo HTML: {e}")
         else:
@@ -162,9 +166,6 @@ with col_imgs:
         st.info(f"📸 {len(uploaded_images)} foto(s) carregada(s) com sucesso.")
 
 
-import datetime
-
-
 # ---------------------------------------------------------
 # 5. AÇÃO PRINCIPAL: GERAÇÃO DO LAUDO PDF
 # ---------------------------------------------------------
@@ -173,30 +174,38 @@ c1, c2, c3 = st.columns([1, 2, 1])
 
 with c2:
     if st.button("🚀 GERAR LAUDO EM PDF", use_container_width=True):
-        if uploaded_html is None:
-            st.warning("⚠️ Por favor, faça o upload do relatório HTML antes de continuar.")
+        if uploaded_html is None or df_dados is None:
+            st.warning("⚠️ Por favor, envie um relatório HTML válido antes de continuar.")
         elif not uploaded_images:
             st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
         else:
             with st.spinner("Processando dados e gerando laudo PDF..."):
                 try:
                     if gerar_pdf_laudo is not None:
-                        # Criar a string de data/hora atual para o parâmetro timestamp_str
                         timestamp_atual = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-                        # Chamada da função com os parâmetros corretos
-                        pdf_bytes = gerar_pdf_laudo(df_dados, timestamp_atual)
+                        # Converte DataFrame para lista de dicionários exigida pelo PDF Generator
+                        if isinstance(df_dados, pd.DataFrame):
+                            pneus_input = df_dados.to_dict(orient="records")
+                        else:
+                            pneus_input = df_dados
 
-                        st.success("🎉 Laudo em PDF gerado com sucesso!")
-                        st.download_button(
-                            label="📥 Baixar Laudo PDF",
-                            data=pdf_bytes,
-                            file_name=f"Laudo_Pneus_Coordenadas_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
+                        if not pneus_input:
+                            st.error("⚠️ Nenhum dado de pneu encontrado para gerar o PDF.")
+                        else:
+                            # Chamada da função com tratamento de dados
+                            pdf_bytes = gerar_pdf_laudo(pneus_input, timestamp_atual)
+
+                            st.success("🎉 Laudo em PDF gerado com sucesso!")
+                            st.download_button(
+                                label="📥 Baixar Laudo PDF",
+                                data=pdf_bytes,
+                                file_name=f"Laudo_Pneus_Coordenadas_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
                     else:
-                        st.error("A função `gerar_pdf_laudo` não está disponível no arquivo pdf_generator.py.")
+                        st.error("A função `gerar_pdf_laudo` não está carregada corretamente.")
 
                 except Exception as e:
                     st.error(f"Ocorreu um erro ao gerar o laudo: {e}")
