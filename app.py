@@ -79,13 +79,13 @@ st.markdown("""
 # ==============================================================================
 # CABEÇALHO (LOGO BÚSSOLA SOZINHA + TÍTULO DA COORDENADAS)
 # ==============================================================================
-col_logo, col_titulo = st.columns([0.8, 6])
+col_logo, col_titulo = st.columns([2, 8])
 
 with col_logo:
     if os.path.exists("ssasdsds.png"):
-        st.image("ssasdsds.png", width=90)
+        st.image("ssasdsds.png", width=220)
     elif os.path.exists("logo-nobg.png"):
-        st.image("logo-nobg.png", width=90)
+        st.image("logo-nobg.png", width=220)
     else:
         st.markdown("# 🧭")
 
