@@ -396,7 +396,7 @@ if st.session_state.get("inspection_results"):
 
             st.markdown("---")
 
-           if res["Pneus"]:
+    if res["Pneus"]:
     fvu_options = st.session_state.get("fvu_data", [])
     
     for i, pneu in enumerate(res["Pneus"], start=1):
@@ -417,7 +417,6 @@ if st.session_state.get("inspection_results"):
                         matching_index = idx
                         break
                 
-                # O usuário pode escolher outro código se a IA tiver se confundido
                 selected_fvu_label = st.selectbox(
                     f"🔍 Classificação FVU (Ajustar se necessário - Pneu {fogo_num})",
                     options=[f"{x['codigo']} - {x['descricao']}" for x in fvu_options],
@@ -425,11 +424,9 @@ if st.session_state.get("inspection_results"):
                     key=f"select_fvu_{i}_{fogo_num}_{res['Timestamp']}"
                 )
                 
-                # Extrai o novo código escolhido
                 novo_codigo = selected_fvu_label.split(" - ")[0]
                 novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
                 
-                # Se o usuário alterou a opção, atualiza os dados do pneu instantaneamente
                 if novo_fvu_obj and novo_fvu_obj['codigo'] != current_code:
                     pneu["codigo_fvu"] = novo_fvu_obj['codigo']
                     pneu["danos"] = novo_fvu_obj['descricao']
@@ -454,7 +451,6 @@ if st.session_state.get("inspection_results"):
             st.write(f"**Causas Prováveis:** {pneu.get('causas_provaveis', '')}")
             st.write(f"**Observações / Ação:** {pneu.get('observacoes', '')}")
 
-            # Botão de download individual com cache atualizado
             pdf_pneu_bytes = gerar_pdf_em_cache(pneu, res["Timestamp"].split()[0])
             st.download_button(
                 label=f"📄 Baixar PDF - Pneu {fogo_num}",
@@ -463,13 +459,13 @@ if st.session_state.get("inspection_results"):
                 mime="application/pdf",
                 key=f"btn_pdf_pneu_{fogo_num}_{i}_{res['Timestamp']}"
             )
-            else:
-                st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
-                st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
-                pdf_fallback = gerar_pdf_fallback(res["Analise_IA_Bruta"], res["Timestamp"])
-                st.download_button(
-                    label="📥 Baixar Laudo Texto Simples",
-                    data=pdf_fallback,
-                    file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                    mime="application/pdf",
-                )
+else:
+    st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
+    st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
+    pdf_fallback = gerar_pdf_fallback(res["Analise_IA_Bruta"], res["Timestamp"])
+    st.download_button(
+        label="📥 Baixar Laudo Texto Simples",
+        data=pdf_fallback,
+        file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+        mime="application/pdf",
+    )
