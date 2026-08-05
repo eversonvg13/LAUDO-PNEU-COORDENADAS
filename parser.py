@@ -61,7 +61,25 @@ def parse_relatorio_html(file_bytes):
                 veiculo = registro.get("VEICULO", "")
                 fogo = registro.get("FOGO", "")
                 if veiculo.isdigit() and fogo.isdigit():
-                    registros.append({c: registro.get(c, "") for c in CAMPOS_FIXOS})
+                    # Mapeia com segurança a quantidade de reforma (prioriza RE, RECAP1, ou VIDA1 se houver)
+                    reforma_val = (
+                        registro.get("RE") or 
+                        registro.get("RECAP1") or 
+                        registro.get("VIDA1") or "0"
+                    )
+                    
+                    reg_dict = {
+                        "FOGO": fogo,
+                        "POS": registro.get("POS", ""),
+                        "VEICULO": veiculo,
+                        "MEDIDA": registro.get("MEDIDA", ""),
+                        "RETIRADA": registro.get("RETIRADA", ""),
+                        "LOCAL": registro.get("LOCAL", ""),
+                        "KM/POS": registro.get("KM/POS", ""),
+                        "KM TOTAL": registro.get("KM TOTAL", ""),
+                        "REFORMA": reforma_val
+                    }
+                    registros.append(reg_dict)
 
     # MÉTODO 2: Fallback para Tabelas HTML padrão (<tr> / <td>)
     if not registros:
@@ -74,11 +92,13 @@ def parse_relatorio_html(file_bytes):
                     veiculo_atual = cols[0]
                 fogo = cols[2]
                 if fogo.isdigit():
+                    # Pega a coluna 8 se existir, senão assume 0
+                    val_reforma = cols[8] if len(cols) > 8 else "0"
                     registros.append({
                         "VEICULO": veiculo_atual,
                         "POS": cols[1],
                         "FOGO": cols[2],
-                        "REFORMA": cols[8],
+                        "REFORMA": val_reforma,
                         "MEDIDA": cols[3],
                         "RETIRADA": cols[4],
                         "LOCAL": cols[5],
