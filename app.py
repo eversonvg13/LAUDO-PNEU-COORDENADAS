@@ -14,9 +14,10 @@ except ImportError:
     process_images_with_ai = None
 
 try:
-    from pdf_generator import create_pdf_report
-except ImportError:
-    create_pdf_report = None
+    from pdf_generator import gerar_pdf_laudo
+except ImportError as e:
+    gerar_pdf_laudo = None
+    st.error(f"Erro ao importar pdf_generator: {e}")
 
 
 # ---------------------------------------------------------
@@ -161,6 +162,9 @@ with col_imgs:
         st.info(f"📸 {len(uploaded_images)} foto(s) carregada(s) com sucesso.")
 
 
+import datetime
+
+
 # ---------------------------------------------------------
 # 5. AÇÃO PRINCIPAL: GERAÇÃO DO LAUDO PDF
 # ---------------------------------------------------------
@@ -169,34 +173,30 @@ c1, c2, c3 = st.columns([1, 2, 1])
 
 with c2:
     if st.button("🚀 GERAR LAUDO EM PDF", use_container_width=True):
-        if not uploaded_html:
+        if uploaded_html is None:
             st.warning("⚠️ Por favor, faça o upload do relatório HTML antes de continuar.")
         elif not uploaded_images:
             st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
         else:
-            with st.spinner("Processando dados e analisando imagens com IA..."):
+            with st.spinner("Processando dados e gerando laudo PDF..."):
                 try:
-                    # 1. Processamento via IA (Gemini API recuperada do Secrets)
-                    api_key = st.secrets.get("GOOGLE_API_KEY", None)
-                    ai_results = {}
-                    
-                    if process_images_with_ai and api_key:
-                        ai_results = process_images_with_ai(uploaded_images, api_key=api_key)
-                    
-                    # 2. Geração do arquivo PDF
-                    if create_pdf_report:
-                        pdf_bytes = create_pdf_report(df_dados, uploaded_images, ai_results)
-                        
+                    if gerar_pdf_laudo is not None:
+                        # Criar a string de data/hora atual para o parâmetro timestamp_str
+                        timestamp_atual = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+                        # Chamada da função com os parâmetros corretos
+                        pdf_bytes = gerar_pdf_laudo(df_dados, timestamp_atual)
+
                         st.success("🎉 Laudo em PDF gerado com sucesso!")
                         st.download_button(
                             label="📥 Baixar Laudo PDF",
                             data=pdf_bytes,
-                            file_name="Laudo_Pneus_Coordenadas.pdf",
+                            file_name=f"Laudo_Pneus_Coordenadas_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                             mime="application/pdf",
                             use_container_width=True
                         )
                     else:
-                        st.info("Laudo processado. (Certifique-se de que o módulo `pdf_generator.py` está configurado para o download).")
+                        st.error("A função `gerar_pdf_laudo` não está disponível no arquivo pdf_generator.py.")
 
                 except Exception as e:
                     st.error(f"Ocorreu um erro ao gerar o laudo: {e}")
