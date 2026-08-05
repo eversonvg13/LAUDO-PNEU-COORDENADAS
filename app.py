@@ -5,6 +5,9 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from PIL import Image
+from fvu_improvements 
+import montar_prompt_com_fvu, selecionar_fvu
+
 
 # Função para carregar a planilha FVU
 @st.cache_data(show_spinner=False)
@@ -53,23 +56,58 @@ if "lista_chaves" not in st.session_state:
     st.session_state.indice_chave_atual = 0
 
 # Função auxiliar de match inteligente entre a descrição da IA e a tabela FVU
-def encontrar_fvu_por_descricao(descricao_ia, fvu_data):
+# Tabela de palavras-chave por código FVU
+FVU_KEYWORDS = {
+    "45B": {"pos": ["topo", "choque", "impacto", "deterioração", "objeto"], "neg": ["flanco", "talão", "ressulc"]},
+    "45F": {"pos": ["flanco", "ferida", "acidental", "furo", "pontiagudo", "guia", "meio-fio"], "neg": ["topo", "talão", "desgaste", "ressulc"]},
+    "45G": {"pos": ["flanco", "choque", "deterioração", "buraco", "calçada", "beliscão"], "neg": ["topo", "talão", "desgaste", "ressulc"]},
+    "45N": {"pos": ["ressulcado", "incorretamente", "falha", "ressulcagem", "mal feito"], "neg": ["não ressulcado"]},
+    "45R": {"pos": ["não ressulcado", "sem ressulcar", "negligência"], "neg": ["incorretamente"]},
+    "45D": {"pos": ["desgaste irregular", "irregular", "alinhamento", "manga", "cubo", "bucha"], "neg": ["extremo", "extrema", "travad", "calvo"]},
+    "46F": {"pos": ["agressão", "repetida", "flanco", "raspagem", "germinado"], "neg": ["topo", "talão", "desgaste"]},
+    "48D": {"pos": ["extremo", "extrema", "utilização extrema", "travad", "calo", "tambor", "careca", "calvo"], "neg": ["irregular", "alinhamento"]},
+    "52B": {"pos": ["flexão", "interior", "sobrecarga", "baixa pressão", "válvula"], "neg": ["flanco", "sem ar", "vazio"]},
+    "52H": {"pos": ["sem ar", "vazio", "rodou vazio", "rodagem sem ar"], "neg": ["interior", "sobrecarga"]},
+    "70J": {"pos": ["talão", "desenrolamento", "retorno", "lona", "descolamento"], "neg": ["ruptura", "rachadura", "quebra"]},
+    "70K": {"pos": ["talão", "separação", "ruptura", "reforço"], "neg": ["rachadura", "alteração", "desenrolamento"]},
+    "70L": {"pos": ["talão", "ruptura", "lona", "carcaça", "rompimento"], "neg": ["separação", "rachadura"]},
+    "70Q": {"pos": ["talão", "alteração", "zona baixa", "deformação"], "neg": ["ruptura", "rachadura", "separação"]},
+    "70R": {"pos": ["talão", "rachadura", "zona baixa", "trinca", "crack"], "neg": ["ruptura", "separação", "alteração"]},
+    "71J": {"pos": ["montagem", "desmontagem", "alavanca"], "neg": []},
+    "71k": {"pos": ["quebra", "talão", "aquecimento", "roda quente"], "neg": []},
+    "75A": {"pos": ["químic", "físic", "óleo", "combustível", "corrosão"], "neg": []},
+}
+
+# Tabela de palavras-chave por código FVU
+codigo_ia = str(item.get("codigo_fvu_sugerido", "")).strip().upper()
+fvu_direto = next((x for x in fvu_data if x["codigo"].strip().upper() == codigo_ia), None)
+fvu_selecionado = fvu_direto if fvu_direto else encontrar_fvu_por_descricao(desc_ia, fvu_data)
     if not descricao_ia or not fvu_data:
         return fvu_data[0] if fvu_data else None
-    
+
     desc_lower = descricao_ia.lower()
-    
     melhor_match = None
-    max_pontos = 0
-    
+    max_score = -999
+
     for item in fvu_data:
-        texto_fvu = (item['descricao'] + " " + item['categoria']).lower()
-        pontos = sum(1 for palavra in desc_lower.split() if len(palavra) > 3 and palavra in texto_fvu)
-        if pontos > max_pontos:
-            max_pontos = pontos
+        codigo = item["codigo"].strip()
+        kw = FVU_KEYWORDS.get(codigo, {})
+        score = 0
+        for termo in kw.get("pos", []):
+            if termo in desc_lower:
+                score += 3
+        for termo in kw.get("neg", []):
+            if termo in desc_lower:
+                score -= 4
+        texto_fvu = (item["descricao"] + " " + item["categoria"]).lower()
+        for palavra in [p for p in texto_fvu.split() if len(p) > 3]:
+            if palavra in desc_lower:
+                score += 1
+        if score > max_score:
+            max_score = score
             melhor_match = item
-            
-    return melhor_match if melhor_match and max_pontos > 0 else fvu_data[0]
+
+    return melhor_match if melhor_match and max_score > 0 else fvu_data[0]
 
 @st.cache_data(show_spinner=False)
 def gerar_pdf_em_cache(pneu_dict, data_str):
@@ -252,35 +290,41 @@ with st.container(border=True):
                 dict_fotos_enviadas = {f.name: f for f in uploaded_files}
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
-                prompt_instrucoes = """
-                Você é um inspetor técnico especialista em pneus de frotas pesadas.
-                Abaixo estão fotos enviadas. Agrupe as fotos de CADA pneu e analise.
+                linhas_fvu = "\n".join([f'  {{"codigo": "{x["codigo"]}", "descricao": "{x["descricao"]}", "categoria": "{x["categoria"]}"}}' for x in fvu_data])
+                
+                
+                prompt_instrucoes = f"""
+Você é um inspetor técnico especialista em pneus de frotas pesadas.
+Analise as fotos enviadas e inspecione cada pneu.
 
-                Sua tarefa para cada pneu nas fotos:
-                1. Leia o número de Fogo escrito a giz.
-                2. Indique a lista EXATA de nomes dos arquivos de imagem que pertencem a este pneu na propriedade "arquivos_fotos".
-                3. Identifique a marca e estado geral do pneu.
-                4. Descreva detalhadamente o dano visual encontrado ou o estado de conservação.
+Sua tarefa para cada pneu:
+1. Leia o número de Fogo escrito a giz.
+2. Indique a lista EXATA de nomes dos arquivos de imagem que pertencem a este pneu em "arquivos_fotos".
+3. Identifique a marca e estado geral do pneu.
+4. Descreva detalhadamente o dano visual encontrado.
+5. CLASSIFIQUE o dano escolhendo o código FVU mais adequado da tabela abaixo.
+   Se o pneu estiver em bom estado, use "OK".
 
-                Responda SOMENTE com um array JSON válido (um objeto por pneu):
-                [
-                  {
-                    "fogo": "string",
-                    "marca": "string",
-                    "sulco": "string",
-                    "arquivos_fotos": ["nome_arquivo1.jpg", "nome_arquivo2.jpg"],
-                    "descricao_dano_ia": "string",
-                    "confianca": "Alta | Média | Baixa"
-                  }
-                ]
-                """
+TABELA FVU:
+[
+{linhas_fvu}
+]
 
-                conteudo_requisicao = []
-                for f in sorted_files:
-                    bytes_comprimidos = comprimir_imagem(f.getvalue())
-                    conteudo_requisicao.append(f"Arquivo: {f.name}")
-                    conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
-                conteudo_requisicao.append(prompt_instrucoes)
+DICA: BANDA DE RODAGEM = parte que toca o solo. FLANCO = lateral. TALÃO = borda interna que encaixa na roda.
+
+Responda SOMENTE com um array JSON válido:
+[
+  {{
+    "fogo": "string",
+    "marca": "string",
+    "sulco": "string",
+    "arquivos_fotos": ["arquivo1.jpg"],
+    "descricao_dano_ia": "string",
+    "codigo_fvu_sugerido": "ex: 45D ou OK",
+    "confianca": "Alta | Média | Baixa"
+  }}
+]
+"""
 
                 # ==============================================================
                 # SISTEMA DE ROTAÇÃO AUTOMÁTICA DE CHAVES E RETRY
@@ -333,7 +377,7 @@ with st.container(border=True):
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
                         
                         desc_ia = item.get("descricao_dano_ia", "")
-                        fvu_selecionado = encontrar_fvu_por_descricao(desc_ia, fvu_data)
+                        fvu_selecionado = selecionar_fvu(item, fvu_data)
                         
                         if fvu_selecionado:
                             codigo_fvu = fvu_selecionado["codigo"]
