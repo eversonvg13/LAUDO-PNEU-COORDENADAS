@@ -84,7 +84,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             
     if logo_path:
         # Passar apenas a largura mantém a proporção original da imagem sem achatar
-        img_logo = RLImage(logo_path, width=95)
+        img_logo = RLImage(logo_path, width=40)
         img_logo.hAlign = 'LEFT'
         header_table_data = [
             [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
