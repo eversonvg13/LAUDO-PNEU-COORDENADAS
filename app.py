@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 import pandas as pd
 import streamlit as st
+from PIL import Image
 
 # Importações dos nossos módulos locais
 from parser import parse_relatorio_html, CAMPOS_FIXOS
@@ -14,25 +15,36 @@ from ai_helper import (
 from pdf_generator import gerar_pdf_laudo, gerar_pdf_fallback
 
 # ==============================================================================
-# CONFIGURAÇÃO DA PÁGINA E ESTILIZAÇÃO CSS (TEMA ESCURO + BOTÃO VERMELHO)
+# CONFIGURAÇÃO DA PÁGINA (ÍCONE DA BÚSSOLA SOZINHA NA ABA)
 # ==============================================================================
+favicon = "🧭"
+if os.path.exists("ssasdsds.png"):
+    try:
+        favicon = Image.open("ssasdsds.png")
+    except Exception:
+        favicon = "🧭"
+
 st.set_page_config(
     page_title="LAUDO PNEUS COORDENADAS",
-    page_icon="🧭",
+    page_icon=favicon,
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Estilização CSS para reproduzir o layout escuro da imagem
+# ==============================================================================
+# ESTILIZAÇÃO CSS (OCULTA BARRA LATERAL + TEMA ESCURO + BOTÃO VERMELHO)
+# ==============================================================================
 st.markdown("""
     <style>
+    /* Ocultar Barra Lateral e Controle de Expandir/Recolher */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
     /* Fundo Escuro da Aplicação */
-    .stApp {
+    .stApp, .main {
         background-color: #0d1117;
         color: #ffffff;
-    }
-    .main {
-        background-color: #0d1117;
     }
 
     /* Estilização do Botão Principal Vermelho */
@@ -65,33 +77,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# BARRA LATERAL
-# ==============================================================================
-st.sidebar.title("🛞 SMART-LOG IA")
-st.sidebar.markdown("### Inspetor Inteligente de Pneus")
-api_key_input = st.sidebar.text_input("Chave da API Gemini", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
-st.sidebar.markdown("---")
-st.sidebar.info("Fotos comprimidas automaticamente. Modelo selecionado dinamicamente entre as versões estáveis do Gemini.")
-
-api_key = api_key_input or st.secrets.get("GEMINI_API_KEY", "")
-
-# ==============================================================================
-# CABEÇALHO (LOGO + TÍTULO DA COORDENADAS)
+# CABEÇALHO (LOGO BÚSSOLA SOZINHA + TÍTULO DA COORDENADAS)
 # ==============================================================================
 col_logo, col_titulo = st.columns([0.8, 6])
 
 with col_logo:
-    # Procura a imagem do logo no diretório local
-    if os.path.exists("logo-nobg.png"):
-        st.image("logo-nobg.png", width=95)
-    elif os.path.exists("ssasdsds.png"):
-        st.image("ssasdsds.png", width=95)
+    if os.path.exists("ssasdsds.png"):
+        st.image("ssasdsds.png", width=90)
+    elif os.path.exists("logo-nobg.png"):
+        st.image("logo-nobg.png", width=90)
     else:
         st.markdown("# 🧭")
 
 with col_titulo:
-    st.markdown("<h1 style='margin-bottom: 0px; margin-top: -10px;'>LAUDO PNEUS COORDENADAS</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='margin-bottom: 0px; margin-top: -5px;'>LAUDO PNEUS COORDENADAS</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color: #8b949e; font-size: 15px;'>Fluxo: 1) Envie o relatório HTML &nbsp;➔&nbsp; 2) Envie as fotos &nbsp;➔&nbsp; 3) Gere o laudo em PDF</p>", unsafe_allow_html=True)
+
+# Configuração da API Key no topo (como a sidebar foi removida)
+with st.expander("🔑 Configurações / Chave de API Gemini", expanded=False):
+    api_key_input = st.text_input("Chave da API Gemini", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
+
+api_key = api_key_input or st.secrets.get("GEMINI_API_KEY", "")
 
 st.markdown("---")
 
@@ -163,7 +169,7 @@ with col2:
     )
 
 # ==============================================================================
-# BOTÃO PRINCIPAL DE EXECUÇÃO (CENTRALIZADO EM VERMELHO)
+# BOTÃO PRINCIPAL DE EXECUÇÃO
 # ==============================================================================
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -171,7 +177,7 @@ if st.button("🚀 GERAR LAUDO EM PDF", type="primary"):
     if not uploaded_files:
         st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
     elif not api_key:
-        st.error("⚠️ Por favor, insira sua chave da API Gemini na barra lateral.")
+        st.error("⚠️ Por favor, insira sua chave da API Gemini nas configurações acima.")
     else:
         if "inspection_results" not in st.session_state:
             st.session_state.inspection_results = []
