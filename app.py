@@ -1,24 +1,49 @@
-import streamlit as st
 import os
+import streamlit as st
+import pandas as pd
 
-# 1. Configuração da página (Modo Wide + Esconder Sidebar)
+# Importação dos módulos customizados do projeto
+try:
+    from parser import parse_html_report
+except ImportError:
+    parse_html_report = None
+
+try:
+    from ai_helper import process_images_with_ai
+except ImportError:
+    process_images_with_ai = None
+
+try:
+    from pdf_generator import create_pdf_report
+except ImportError:
+    create_pdf_report = None
+
+
+# ---------------------------------------------------------
+# 1. CONFIGURAÇÃO DA PÁGINA & ÍCONE DA ABA
+# ---------------------------------------------------------
+ICON_PATH = "ssasdsds.png" if os.path.exists("ssasdsds.png") else ("logo-nobg.png" if os.path.exists("logo-nobg.png") else "🎯")
+
 st.set_page_config(
     page_title="Laudo Pneus Coordenadas",
-    page_icon="🎯",
+    page_icon=ICON_PATH,
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 2. Estilo CSS Customizado (Cores da Coordenadas + Ocultar Sidebar)
+
+# ---------------------------------------------------------
+# 2. ESTILIZAÇÃO CSS CUSTOMIZADA (CORES DA MARCA)
+# ---------------------------------------------------------
 st.markdown("""
     <style>
     /* Ocultar Barra Lateral (Sidebar) e Botão de Alternância */
     [data-testid="collapsedControl"] { display: none !important; }
     section[data-testid="stSidebar"] { display: none !important; }
 
-    /* Ajuste de espaçamento no topo da página */
+    /* Ajuste do container principal */
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 1.8rem;
         padding-bottom: 2rem;
         max-width: 1250px;
     }
@@ -30,56 +55,63 @@ st.markdown("""
         font-weight: 800;
         color: #FFFFFF;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-top: 5px;
-        margin-bottom: 2px;
+        letter-spacing: 1.5px;
+        margin: 0;
+        padding: 0;
     }
 
-    /* Subtítulo / Fluxo */
+    /* Subtítulo do Fluxo */
     .sub-title {
         font-size: 0.95rem;
         color: #A0AAB2;
+        margin-top: 4px;
         margin-bottom: 1.5rem;
     }
 
-    /* Estilização dos Botões com Vermelho da Logo */
+    /* Estilização dos Botões no Vermelho da Logo (#D31C24) */
     .stButton > button {
         background-color: #D31C24 !important;
         color: #FFFFFF !important;
         border: none !important;
         border-radius: 6px !important;
-        font-weight: bold !important;
-        font-size: 1rem !important;
-        padding: 0.6rem 1.5rem !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+        padding: 0.65rem 1.5rem !important;
         transition: all 0.3s ease;
     }
     
     .stButton > button:hover {
         background-color: #B0151B !important;
-        box-shadow: 0px 4px 12px rgba(211, 28, 36, 0.4);
+        box-shadow: 0px 4px 14px rgba(211, 28, 36, 0.45);
     }
 
-    /* Bordas de destaque nas seções */
+    /* Destaque nos Expanders com o Verde/Teal da Logo (#005C54) */
     div[data-testid="stExpander"] {
         border: 1px solid #005C54 !important;
+        border-radius: 8px;
+    }
+
+    /* Ajuste visual das caixas de upload */
+    div[data-testid="stFileUploader"] {
+        padding: 0.5rem;
         border-radius: 8px;
     }
     </style>
 """, unsafe_allow_html=True)
 
+
 # ---------------------------------------------------------
-# TOPO: LOGO E TÍTULO PRINCIPAL (SEM BARRA LATERAL)
+# 3. CABEÇALHO: LOGO DA BÚSSOLA + TÍTULO
 # ---------------------------------------------------------
-col_logo, col_header = st.columns([1, 6], vertical_alignment="center")
+col_logo, col_header = st.columns([1, 8], vertical_alignment="center")
 
 with col_logo:
-    # Garanta que a imagem 'logo-nobg.png' esteja na raiz da pasta do seu projeto
-    if os.path.exists("logo-nobg.png"):
-        st.image("logo-nobg.png", width=120)
-    elif os.path.exists("logo.png"):
-        st.image("logo.png", width=120)
+    if os.path.exists("ssasdsds.png"):
+        st.image("ssasdsds.png", width=85)
+    elif os.path.exists("logo-nobg.png"):
+        st.image("logo-nobg.png", width=85)
     else:
-        st.write("🧭") # Fallback caso a imagem ainda não esteja na pasta
+        st.write("🧭")
 
 with col_header:
     st.markdown('<h1 class="main-title">LAUDO PNEUS COORDENADAS</h1>', unsafe_allow_html=True)
@@ -87,25 +119,36 @@ with col_header:
 
 st.markdown("---")
 
-# ---------------------------------------------------------
-# UPLOAD COMPACTO LADO A LADO (2 COLUNAS)
-# ---------------------------------------------------------
-col1, col2 = st.columns(2, gap="large")
 
-with col1:
+# ---------------------------------------------------------
+# 4. UPLOADS LADO A LADO (COMPACTOS)
+# ---------------------------------------------------------
+col_html, col_imgs = st.columns(2, gap="large")
+
+with col_html:
     st.markdown("### 📄 1. Relatório de Troca (HTML)")
     uploaded_html = st.file_uploader(
         "Envie o relatório exportado em HTML", 
         type=["html", "htm"], 
         key="html_uploader"
     )
-    
-    if uploaded_html:
-        st.success("✅ Relatório carregado com sucesso!")
-        with st.expander("📋 Ver / editar dados extraídos do relatório"):
-            st.info("Aqui entram as tabelas/dados parseados do HTML.")
 
-with col2:
+    df_dados = None
+    if uploaded_html is not None:
+        if parse_html_report:
+            try:
+                df_dados = parse_html_report(uploaded_html)
+                qtd_pneus = len(df_dados) if df_dados is not None else 0
+                st.success(f"✅ {qtd_pneus} pneus extraídos do relatório.")
+                
+                with st.expander("📋 Ver / editar dados extraídos do relatório"):
+                    df_dados = st.data_editor(df_dados, num_rows="dynamic", use_container_width=True)
+            except Exception as e:
+                st.error(f"Erro ao processar arquivo HTML: {e}")
+        else:
+            st.success("✅ Arquivo HTML recebido com sucesso!")
+
+with col_imgs:
     st.markdown("### 📸 2. Fotos dos Pneus")
     uploaded_images = st.file_uploader(
         "Envie o lote completo de fotos dos pneus", 
@@ -113,20 +156,47 @@ with col2:
         accept_multiple_files=True,
         key="img_uploader"
     )
-    
+
     if uploaded_images:
-        st.info(f"📸 {len(uploaded_images)} foto(s) carregada(s).")
+        st.info(f"📸 {len(uploaded_images)} foto(s) carregada(s) com sucesso.")
+
 
 # ---------------------------------------------------------
-# AÇÃO PRINCIPAL / GERAÇÃO DE LAUDO
+# 5. AÇÃO PRINCIPAL: GERAÇÃO DO LAUDO PDF
 # ---------------------------------------------------------
 st.markdown("<br>", unsafe_allow_html=True)
-col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+c1, c2, c3 = st.columns([1, 2, 1])
 
-with col_btn2:
+with c2:
     if st.button("🚀 GERAR LAUDO EM PDF", use_container_width=True):
         if not uploaded_html:
-            st.warning("Por favor, faça o upload do relatório HTML primeiro.")
+            st.warning("⚠️ Por favor, faça o upload do relatório HTML antes de continuar.")
+        elif not uploaded_images:
+            st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
         else:
-            st.success("Gerando laudo com inteligência artificial...")
-            # Chame aqui a função do seu `pdf_generator.py`
+            with st.spinner("Processando dados e analisando imagens com IA..."):
+                try:
+                    # 1. Processamento via IA (Gemini API recuperada do Secrets)
+                    api_key = st.secrets.get("GOOGLE_API_KEY", None)
+                    ai_results = {}
+                    
+                    if process_images_with_ai and api_key:
+                        ai_results = process_images_with_ai(uploaded_images, api_key=api_key)
+                    
+                    # 2. Geração do arquivo PDF
+                    if create_pdf_report:
+                        pdf_bytes = create_pdf_report(df_dados, uploaded_images, ai_results)
+                        
+                        st.success("🎉 Laudo em PDF gerado com sucesso!")
+                        st.download_button(
+                            label="📥 Baixar Laudo PDF",
+                            data=pdf_bytes,
+                            file_name="Laudo_Pneus_Coordenadas.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("Laudo processado. (Certifique-se de que o módulo `pdf_generator.py` está configurado para o download).")
+
+                except Exception as e:
+                    st.error(f"Ocorreu um erro ao gerar o laudo: {e}")
