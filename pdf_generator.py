@@ -1,5 +1,6 @@
 import io
 import os
+from PIL import Image as PILImage
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import (
@@ -54,7 +55,6 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         textColor=colors.HexColor('#000000')
     )
     
-    # Fonte maior e em preto puro para melhor legibilidade das descrições
     style_section_body = ParagraphStyle(
         'SectionBody',
         parent=styles['Normal'],
@@ -75,7 +75,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     
     story = []
     
-    # 1. Cabeçalho com Logo (Proporção corrigida informando apenas a largura)
+    # 1. Cabeçalho com Logo (Com alta resolução via LANCZOS para evitar pixelação)
     logo_path = None
     for nome_img in ["ssasdsds.png", "logo-nobg.png", "logo.png"]:
         if os.path.exists(nome_img):
@@ -86,15 +86,25 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         try:
             with PILImage.open(logo_path) as pil_img:
                 orig_w, orig_h = pil_img.size
-                desired_w = 95  # Largura padrão controlada
-                desired_h = (orig_h * desired_w) / orig_w  # Altura proporcional matemática
-            img_logo = RLImage(logo_path, width=desired_w, height=desired_h)
+                desired_w = 95  # Largura de exibição
+                desired_h = (orig_h * desired_w) / orig_w  # Altura proporcional
+                
+                # Upscaling de alta qualidade para o PDF renderizar nítido
+                scale_factor = 3
+                high_res_img = pil_img.resize(
+                    (int(desired_w * scale_factor), int(desired_h * scale_factor)), 
+                    PILImage.Resampling.LANCZOS
+                )
+                
+                logo_io = io.BytesIO()
+                high_res_img.save(logo_io, format='PNG', optimize=True)
+                logo_io.seek(0)
+                
+                img_logo = RLImage(logo_io, width=desired_w, height=desired_h)
         except Exception:
             img_logo = RLImage(logo_path, width=95, height=32)
         
         img_logo.hAlign = 'LEFT'
-            
-   
         header_table_data = [
             [img_logo, Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, alignment=TA_RIGHT))]
         ]
@@ -176,10 +186,10 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     obs = pneu.get('observacoes', '') or pneu.get('acao_recomendada', '')
     
     secoes_data = [
-        [Paragraph(f"<b>Dano causado:</b> {danos}", style_section_body)],
+        [Paragraph(danos, style_section_body)],
         [Paragraph(f"<b>Causas prováveis:</b> {causas}", style_section_body)],
         [Paragraph(f"<b>Observações:</b> {obs}", style_section_body)],
-        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=7 color='#333333'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Enc. Borracharia</font>", style_section_body)]
+        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=7 color='#333333'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Enc. Borracharia</font>", style_section_body)]
     ]
     
     t_secoes = Table(secoes_data, colWidths=[560])
@@ -194,7 +204,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(t_secoes)
     story.append(Spacer(1, 3))
     
-    # 4. Bloco da Garagem Ampliado (Linhas estendidas até as bordas e quantidade aumentada)
+    # 4. Bloco da Garagem Ampliado
     linha_completa = "_" * 110
     linhas_pautadas = "<br/>".join([linha_completa] * 14)
     espaco_garagem_data = [
@@ -229,10 +239,10 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     ]))
     story.append(t_assinatura)
     
-    # 6. Fotos Específicas do Pneu (Deslocadas um pouco mais para baixo com espaçamento maior)
+    # 6. Fotos Específicas do Pneu
     imagens_pneu = pneu.get('imagens_bytes', [])
     if imagens_pneu:
-        story.append(Spacer(1, 10))  # Espaçamento maior para posicionar as fotos mais abaixo
+        story.append(Spacer(1, 10))
         story.append(Paragraph("<b>Registro Fotográfico do Pneu:</b>", style_section_title))
         story.append(Spacer(1, 4))
         
