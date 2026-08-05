@@ -31,8 +31,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'HeaderTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=13,  # Era 11
-        leading=16,   # Era 14
+        fontSize=16,  # Era 11
+        leading=18,   # Era 14
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
     )
@@ -111,7 +111,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         t_header = Table(header_table_data, colWidths=[120, 325, 115])
     else:
         header_table_data = [
-            [Paragraph("<b>COORDENADAS</b>", style_header_title), Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b><br/><font size=10>Laudo de Pneus</font>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
+            [Paragraph("<b>COORDENADAS</b>", style_header_title), Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b><br/><font size=14>Laudo de Pneus</font>", style_header_title), Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
         ]
         t_header = Table(header_table_data, colWidths=[120, 325, 115])
         
@@ -205,7 +205,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     story.append(Spacer(1, 3))
     
     # 4. Bloco da Garagem Ampliado
-    linha_completa = "_" * 110
+    linha_completa = "_" * 100
     linhas_pautadas = "<br/>".join([linha_completa] * 14)
     espaco_garagem_data = [
         [Paragraph("<b>Resposta da Garagem (Defeitos encontrados no veículo / Ações executadas):</b>", style_section_title)],
