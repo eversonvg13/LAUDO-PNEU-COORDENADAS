@@ -1,4 +1,4 @@
-def gerar_pdf_laudo_pneu(pneu, data_analise):
+def pdf_generator(pneu, data_analise):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
