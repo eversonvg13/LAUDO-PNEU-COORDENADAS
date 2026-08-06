@@ -460,8 +460,8 @@ if st.session_state.get("inspection_results"):
 
                         st.markdown("---")
 
-                        # ==============================================================
-                        # VINCULAÇÃO INTELIGENTE DE FOTOS (Com tamanho reduzido)
+                            # ==============================================================
+                        # FOTOS COM ROTAÇÃO DINÂMICA E INTEGRAÇÃO NO PDF
                         # ==============================================================
                         col_fotos, col_dados = st.columns([1, 2])
 
@@ -485,13 +485,35 @@ if st.session_state.get("inspection_results"):
                                 end_idx = start_idx + chunk_size if i < total_pneus else total_imgs
                                 imagens_do_pneu = lista_imagens_lote[start_idx:end_idx]
 
-                            # Renderiza as miniaturas com largura controlada (ex: 220 pixels)
                             if imagens_do_pneu:
-                                for img_f in imagens_do_pneu:
-                                    st.image(img_f, caption=img_f.name, width=220)
+                                for idx_img, img_f in enumerate(imagens_do_pneu):
+                                    # Chave única para controlar o ângulo de rotação da imagem no session_state
+                                    key_rot = f"rot_img_{res['Timestamp']}_{i}_{idx_img}"
+                                    if key_rot not in st.session_state:
+                                        st.session_state[key_rot] = 0  # Ângulo inicial (0 graus)
+
+                                    # Botão compacto para girar 90 graus sentido horário
+                                    if st.button(f"🔄 Girar 90° ({img_f.name})", key=f"btn_rot_{key_rot}"):
+                                        st.session_state[key_rot] = (st.session_state[key_rot] + 90) % 360
+
+                                    angulo_atual = st.session_state[key_rot]
+
+                                    # Abre a imagem com PIL (Pillow) para aplicar a rotação e exibir/salvar
+                                    from PIL import Image as PILImage
+                                    img_pil = PILImage.open(img_f)
+                                    if angulo_atual > 0:
+                                        # Rotaciona no sentido anti-horário no PIL para equivaler ao horário visual
+                                        img_pil = img_pil.rotate(-angulo_atual, expand=True)
+
+                                    # Exibe a imagem rotacionada na largura compacta
+                                    st.image(img_pil, caption=f"{img_f.name} ({angulo_atual}°)", width=220)
+
+                                    # Salva o ângulo no objeto do pneu para a função de PDF ler depois
+                                    if "rotacoes_imagens" not in pneu_exibicao:
+                                        pneu_exibicao["rotacoes_imagens"] = {}
+                                    pneu_exibicao["rotacoes_imagens"][img_f.name] = angulo_atual
                             else:
                                 st.caption("Nenhuma foto disponível.")
-
                         with col_dados:
                             if fvu_options:
                                 current_code = pneu.get("codigo_fvu", "")
