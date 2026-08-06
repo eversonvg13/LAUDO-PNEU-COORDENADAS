@@ -42,6 +42,20 @@ def carregar_tabela_fvu():
         st.error(f"⚠️ Erro ao carregar a planilha: {e}")
         return []
 
+
+
+#lista de unidade
+unidades_disponiveis = [
+    "ANA LUCIA",
+    "JUSTINOPOLES",
+    "LAFAIETE",
+    "MARIA GORETTI",
+    "NEVES",
+    "SARZEDO",
+    "UBERLANDIA",
+    "VENEZA"
+]
+
 # Inicializa os dados FVU na sessão
 if "fvu_data" not in st.session_state:
     st.session_state.fvu_data = carregar_tabela_fvu()
@@ -548,7 +562,22 @@ if st.session_state.get("inspection_results"):
                                 st.write(f"**RETIRADA:** {pneu_exibicao.get('retirada', '')}")
                                 st.write(f"**Nº REFORMAS:** {pneu_exibicao.get('n_reformas', '')}")
                             with c2:
-                                st.write(f"**LOCAL/UNIDADE:** {pneu_exibicao.get('local', '')}")
+                              # --- LISTA SUSPENSA DE UNIDADES/LOCAL ---
+                                local_atual = pneu_exibicao.get('local', '').strip().upper()
+                                # Descobre o índice atual se já vier preenchido, senão padrão é 0
+                                idx_local = 0
+                                if local_atual in unidades_disponiveis:
+                                    idx_local = unidades_disponiveis.index(local_atual)
+                                
+                                novo_local = st.selectbox(
+                                    "📍 **LOCAL/UNIDADE:**",
+                                    options=unidades_disponiveis,
+                                    index=idx_local,
+                                    key=f"select_local_{i}_{fogo_atual_usuario}_{res['Timestamp']}"
+                                )
+                                # Atualiza o dicionário com a unidade selecionada
+                                pneu_exibicao['local'] = novo_local
+                                # ----------------------------------------
                                 st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
                                 st.write(f"**KM TOTAL:** {pneu_exibicao.get('km_total', '')}")
                                 st.write(f"**Confiança IA:** {pneu_exibicao.get('confianca', '')}")
