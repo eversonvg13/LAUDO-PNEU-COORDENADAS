@@ -205,7 +205,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         [Paragraph(f"<b>Dano causado:</b> {danos}", style_section_body)],
         [Paragraph(f"<b>Causas prováveis:</b> {causas}", style_section_body)],
         [Paragraph(f"<b>Observações:</b> {obs}", style_section_body)],
-        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=9 color='#333333'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Enc. Borracharia</font>", style_section_body)]
+        [Paragraph("Laudo relatado por: &nbsp; &nbsp; <b>Everson Veloso</b><br/><font size=9 color='#333333'>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Enc. Borracharia</font>", style_section_body)]
     ]
     
     t_secoes = Table(secoes_data, colWidths=[560])
