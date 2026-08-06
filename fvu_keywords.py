@@ -407,6 +407,26 @@ def gerar_guia_prompt_fvu():
         
     return "\n".join(texto)
 
+def gerar_prompt_sistema_ia():
+    """Gera o prompt completo de sistema integrando o guia técnico e o formato de saída JSON para a IA."""
+    guia_tecnico = gerar_guia_prompt_fvu()
+    return f"""Você é um assistente especializado em análise de pneus para uma frota logística, seguindo rigorosamente o Manual FVU da Michelin.
+Sua tarefa é analisar a imagem enviada (que contém o código de classificação manuscrito e o número de série/fogo do pneu) e extrair os dados necessários.
+
+{guia_tecnico}
+
+INSTRUÇÕES DE SAÍDA:
+- Identifique o código FVU correto com base na árvore de decisão e glossário.
+- Extraia o ID/número de série do pneu visível na imagem.
+- Retorne APENAS um objeto JSON válido, sem blocos de código markdown adicionais, estruturado exatamente assim:
+{{
+  "codigo_fvu": "string com o código (ex: 45B, 48D) ou null",
+  "id_pneu": "string com o número de série/fogo ou null",
+  "confianca": "alta/media/baixa",
+  "observacoes": "breve descrição técnica justificando o código escolhido"
+}}
+"""
+
 def encontrar_fvu_por_descricao(descricao_ia, fvu_data):
     """Encontra o código FVU na planilha correspondente à descrição gerada pela IA."""
     if not descricao_ia or not fvu_data:
