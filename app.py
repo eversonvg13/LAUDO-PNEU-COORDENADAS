@@ -396,8 +396,9 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
             except Exception as e:
                 st.error(f"Erro no processamento: {str(e)}")
 
+
 # ==============================================================================
-# EXIBIÇÃO DOS RESULTADOS (COM MENU DE CORREÇÃO)
+# EXIBIÇÃO DOS RESULTADOS (COM MINIATURAS AO LADO E CORREÇÃO DE FOGO)
 # ==============================================================================
 if st.session_state.get("inspection_results"):
     st.markdown("---")
@@ -411,78 +412,121 @@ if st.session_state.get("inspection_results"):
 
     for res in st.session_state.inspection_results:
         with st.expander(f"🛞 Lote Processado ({len(res['Imagens'])} fotos)", expanded=True):
-            st.markdown("##### Miniaturas Enviadas:")
-            cols = st.columns(min(len(res["Imagens"]), 6))
-            for idx, img_file in enumerate(res["Imagens"]):
-                with cols[idx % 6]:
-                    st.image(img_file, caption=img_file.name, width=150)
-
-            st.markdown("---")
-
             if res["Pneus"]:
                 fvu_options = st.session_state.get("fvu_data", [])
+                tabela_df = st.session_state.dados_relatorio
+                dict_fotos_enviadas = {f.name: f for f in res["Imagens"]}
                 
                 for i, pneu in enumerate(res["Pneus"], start=1):
-                    fogo_num = pneu.get('fogo', f'N/A_{i}')
-                    titulo = f"PNEU {i} — FOGO {fogo_num}"
-                    if pneu.get("fogo_localizado_na_planilha") is False:
-                        titulo += " ⚠️ (não encontrado na planilha)"
+                    # Chave única para o estado do fogo corrigido pelo usuário
+                    key_fogo_input = f"input_fogo_corrigido_{i}_{res['Timestamp']}"
+                    
+                    # Inicializa o valor com o fogo detectado pela IA se não existir
+                    if key_fogo_input not in st.session_state:
+                        st.session_state[key_fogo_input] = pneu.get('fogo', '')
 
                     with st.container(border=True):
-                        st.markdown(f"### 🛞 {titulo}")
-                        
+                        # Cabeçalho com input para corrigir o número de fogo caso a IA tenha falhado
+                        col_tit1, col_tit2 = st.columns([2, 1])
+                        with col_tit1:
+                            fogo_atual_usuario = st.text_input(
+                                f"🛞 Pneu {i} — Número de Fogo (Ajuste se necessário)",
+                                value=st.session_state[key_fogo_input],
+                                key=key_fogo_input
+                            ).strip()
+                        with col_tit2:
+                            # Rebusca na planilha HTML com base no novo número de fogo digitado
+                            dados_tabela_atualizados = buscar_dados_relatorio(fogo_atual_usuario, tabela_df)
+                            encontrou_planilha = dados_tabela_atualizados is not None
+                            
+                            if encontrou_planilha:
+                                st.markdown("<p style='color: #22c55e; margin-top: 30px; font-weight: bold;'>✅ Localizado na Planilha</p>", unsafe_allow_html=True)
+                            else:
+                                st.markdown("<p style='color: #eab308; margin-top: 30px; font-weight: bold;'>⚠️ Não encontrado na planilha</p>", unsafe_allow_html=True)
+
                         pneu_exibicao = pneu.copy()
-                        
-                        if fvu_options:
-                            current_code = pneu.get("codigo_fvu", "")
-                            matching_index = 0
-                            for idx, opt in enumerate(fvu_options):
-                                if opt['codigo'].lower() == current_code.lower():
-                                    matching_index = idx
-                                    break
-                            
-                            selected_fvu_label = st.selectbox(
-                                f"🔍 Classificação FVU (Ajustar se necessário - Pneu {fogo_num})",
-                                options=[f"{x['codigo']} - {x['descricao']}" for x in fvu_options],
-                                index=matching_index,
-                                key=f"select_fvu_{i}_{fogo_num}_{res['Timestamp']}"
+                        pneu_exibicao['fogo'] = fogo_atual_usuario
+
+                        # Atualiza os dados da tabela se o usuário alterou o fogo
+                        if dados_tabela_atualizados is not None:
+                            pneu_exibicao["pos"] = dados_tabela_atualizados.get("POS", "")
+                            pneu_exibicao["veiculo"] = dados_tabela_atualizados.get("VEICULO", "")
+                            pneu_exibicao["medida"] = dados_tabela_atualizados.get("MEDIDA", "")
+                            pneu_exibicao["retirada"] = dados_tabela_atualizados.get("RETIRADA", "")
+                            pneu_exibicao["local"] = dados_tabela_atualizados.get("LOCAL", "")
+                            pneu_exibicao["km_pos"] = dados_tabela_atualizados.get("KM/POS", "")
+                            pneu_exibicao["km_total"] = dados_tabela_atualizados.get("KM TOTAL", "")
+                            pneu_exibicao["n_reformas"] = str(dados_tabela_atualizados.get("Re", dados_tabela_atualizados.get("REFORMAS", dados_tabela_atualizados.get("RE", "0")))).strip()
+                            pneu_exibicao["fogo_localizado_na_planilha"] = True
+                        else:
+                            pneu_exibicao["fogo_localizado_na_planilha"] = False
+
+                        st.markdown("---")
+
+                        # LAYOUT EM DUAS COLUNAS: Esquerda (Miniaturas das Fotos) | Direita (Dados e Laudo)
+                        col_fotos, col_dados = st.columns([1, 2])
+
+                        with col_fotos:
+                            st.markdown("##### 🖼️ Fotos deste Pneu:")
+                            fotos_pneu_nomes = pneu.get("arquivos_fotos", [])
+                            if fotos_pneu_nomes:
+                                for nome_f in fotos_pneu_nomes:
+                                    if nome_f in dict_fotos_enviadas:
+                                        st.image(dict_fotos_enviadas[nome_f], caption=nome_f, use_column_width=True)
+                            else:
+                                st.caption("Nenhuma foto vinculada automaticamente.")
+
+                        with col_dados:
+                            if fvu_options:
+                                current_code = pneu.get("codigo_fvu", "")
+                                matching_index = 0
+                                for idx, opt in enumerate(fvu_options):
+                                    if opt['codigo'].lower() == current_code.lower():
+                                        matching_index = idx
+                                        break
+                                
+                                selected_fvu_label = st.selectbox(
+                                    f"🔍 Classificação FVU",
+                                    options=[f"{x['codigo']} - {x['descricao']}" for x in fvu_options],
+                                    index=matching_index,
+                                    key=f"select_fvu_{i}_{fogo_atual_usuario}_{res['Timestamp']}"
+                                )
+                                
+                                novo_codigo = selected_fvu_label.split(" - ")[0]
+                                novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
+                                
+                                if novo_fvu_obj:
+                                    pneu_exibicao["codigo_fvu"] = novo_fvu_obj['codigo']
+                                    pneu_exibicao["danos"] = novo_fvu_obj['descricao']
+                                    pneu_exibicao["causas_provaveis"] = novo_fvu_obj['causa']
+                                    pneu_exibicao["observacoes"] = novo_fvu_obj['acao']
+                                    pneu_exibicao["acao_recomendada"] = novo_fvu_obj['acao']
+
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                st.write(f"**POS:** {pneu_exibicao.get('pos', '')}")
+                                st.write(f"**VEÍCULO:** {pneu_exibicao.get('veiculo', '')}")
+                                st.write(f"**MEDIDA:** {pneu_exibicao.get('medida', '')}")
+                                st.write(f"**RETIRADA:** {pneu_exibicao.get('retirada', '')}")
+                                st.write(f"**Nº REFORMAS:** {pneu_exibicao.get('n_reformas', '')}")
+                            with c2:
+                                st.write(f"**LOCAL/UNIDADE:** {pneu_exibicao.get('local', '')}")
+                                st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
+                                st.write(f"**KM TOTAL:** {pneu_exibicao.get('km_total', '')}")
+                                st.write(f"**Confiança IA:** {pneu_exibicao.get('confianca', '')}")
+
+                            st.write(f"**Laudo / Dano Relatado:** {pneu_exibicao.get('danos', '')}")
+                            st.write(f"**Causas Prováveis:** {pneu_exibicao.get('causas_provaveis', '')}")
+                            st.write(f"**Observações / Ação:** {pneu_exibicao.get('observacoes', '')}")
+
+                            pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
+                            st.download_button(
+                                label=f"📄 Baixar PDF - Pneu {fogo_atual_usuario}",
+                                data=pdf_pneu_bytes,
+                                file_name=f"laudo_pneu_{fogo_atual_usuario}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_pdf_pneu_{fogo_atual_usuario}_{i}_{res['Timestamp']}"
                             )
-                            
-                            novo_codigo = selected_fvu_label.split(" - ")[0]
-                            novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
-                            
-                            if novo_fvu_obj:
-                                pneu_exibicao["codigo_fvu"] = novo_fvu_obj['codigo']
-                                pneu_exibicao["danos"] = novo_fvu_obj['descricao']
-                                pneu_exibicao["causas_provaveis"] = novo_fvu_obj['causa']
-                                pneu_exibicao["observacoes"] = novo_fvu_obj['acao']
-                                pneu_exibicao["acao_recomendada"] = novo_fvu_obj['acao']
-
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            st.write(f"**POS:** {pneu_exibicao.get('pos', '')}")
-                            st.write(f"**VEÍCULO:** {pneu_exibicao.get('veiculo', '')}")
-                            st.write(f"**MEDIDA:** {pneu_exibicao.get('medida', '')}")
-                            st.write(f"**RETIRADA:** {pneu_exibicao.get('retirada', '')}")
-                            st.write(f"**Nº REFORMAS:** {pneu_exibicao.get('n_reformas', '')}")
-                        with c2:
-                            st.write(f"**LOCAL/UNIDADE:** {pneu_exibicao.get('local', '')}")
-                            st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
-                            st.write(f"**KM TOTAL:** {pneu_exibicao.get('km_total', '')}")
-                            st.write(f"**Confiança IA:** {pneu_exibicao.get('confianca', '')}")
-
-                        st.write(f"**Laudo / Dano Relatado:** {pneu_exibicao.get('danos', '')}")
-                        st.write(f"**Causas Prováveis:** {pneu_exibicao.get('causas_provaveis', '')}")
-                        st.write(f"**Observações / Ação:** {pneu_exibicao.get('observacoes', '')}")
-
-                        pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
-                        st.download_button(
-                            label=f"📄 Baixar PDF - Pneu {fogo_num}",
-                            data=pdf_pneu_bytes,
-                            file_name=f"laudo_pneu_{fogo_num}.pdf",
-                            mime="application/pdf",
-                            key=f"btn_pdf_pneu_{fogo_num}_{i}_{res['Timestamp']}"
-                        )
             else:
                 st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
                 st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
