@@ -493,7 +493,7 @@ if st.session_state.get("inspection_results"):
                                         st.session_state[key_rot] = 0  # Ângulo inicial (0 graus)
 
                                     # Botão compacto para girar 90 graus sentido horário
-                                    if st.button(f"🔄 Girar 90° ({img_f.name})", key=f"btn_rot_{key_rot}"):
+                                    if st.button(f"🔄 Girar 90°", key=f"btn_rot_{key_rot}"):
                                         st.session_state[key_rot] = (st.session_state[key_rot] + 90) % 360
 
                                     angulo_atual = st.session_state[key_rot]
