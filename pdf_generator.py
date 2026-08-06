@@ -1,19 +1,3 @@
-import io
-import os
-from PIL import Image as PILImage
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
-    Table,
-    TableStyle,
-    Image as RLImage
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
-
 def gerar_pdf_laudo_pneu(pneu, data_analise):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -31,8 +15,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'HeaderTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=14,  # Era 11
-        leading=14,   # Era 14
+        fontSize=14,
+        leading=14,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
     )
@@ -41,8 +25,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'CellValue',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=10,  # Era 8
-        leading=12,   # Era 10
+        fontSize=10,
+        leading=12,
         textColor=colors.HexColor('#000000')
     )
     
@@ -50,8 +34,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'SectionTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=10.5, # Era 8.5
-        leading=13,    # Era 11
+        fontSize=10.5,
+        leading=13,
         textColor=colors.HexColor('#000000')
     )
     
@@ -59,8 +43,8 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'SectionBody',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=11,   # Era 9
-        leading=14,    # Era 12
+        fontSize=11,
+        leading=14,
         textColor=colors.HexColor('#000000')
     )
 
@@ -68,14 +52,14 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         'GaragemLines',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9.5,  # Era 7.5
-        leading=11.5,  # Era 9.5
+        fontSize=9.5,
+        leading=11.5,
         textColor=colors.HexColor('#999999')
     )
 
     story = []
     
-    # 1. Cabeçalho com Logo (Com alta resolução via LANCZOS para evitar pixelação)
+    # 1. Cabeçalho com Logo
     logo_path = None
     for nome_img in ["ssasdsds.png", "logo-nobg.png", "logo.png"]:
         if os.path.exists(nome_img):
@@ -86,10 +70,9 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         try:
             with PILImage.open(logo_path) as pil_img:
                 orig_w, orig_h = pil_img.size
-                desired_w = 95  # Largura de exibição
-                desired_h = (orig_h * desired_w) / orig_w  # Altura proporcional
+                desired_w = 95
+                desired_h = (orig_h * desired_w) / orig_w
                 
-                # Upscaling de alta qualidade para o PDF renderizar nítido
                 scale_factor = 3
                 high_res_img = pil_img.resize(
                     (int(desired_w * scale_factor), int(desired_h * scale_factor)), 
@@ -105,71 +88,33 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             img_logo = RLImage(logo_path, width=95, height=32)
         
         img_logo.hAlign = 'LEFT'
-      # Criar um estilo específico e independente para o "Laudo de Pneus"
+
     style_header_sub = ParagraphStyle(
         'HeaderSub',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=16,  # <-- Altere aqui o tamanho do "Laudo de Pneus" livremente (ex: 12, 13, 14...)
+        fontSize=16,
         leading=15,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#000000')
     )
-
-    # 1. Cabeçalho com Logo (Com alta resolução via LANCZOS para evitar pixelação)
-    logo_path = None
-    for nome_img in ["ssasdsds.png", "logo-nobg.png", "logo.png"]:
-        if os.path.exists(nome_img):
-            logo_path = nome_img
-            break
-            
+        
+    bloco_titulo_central = [
+        Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title),
+        Spacer(1, 2),
+        Paragraph("Laudo de Pneus", style_header_sub)
+    ]
+    
     if logo_path:
-        try:
-            with PILImage.open(logo_path) as pil_img:
-                orig_w, orig_h = pil_img.size
-                desired_w = 95  # Largura de exibição
-                desired_h = (orig_h * desired_w) / orig_w  # Altura proporcional
-                
-                # Upscaling de alta qualidade para o PDF renderizar nítido
-                scale_factor = 3
-                high_res_img = pil_img.resize(
-                    (int(desired_w * scale_factor), int(desired_h * scale_factor)), 
-                    PILImage.Resampling.LANCZOS
-                )
-                
-                logo_io = io.BytesIO()
-                high_res_img.save(logo_io, format='PNG', optimize=True)
-                logo_io.seek(0)
-                
-                img_logo = RLImage(logo_io, width=desired_w, height=desired_h)
-        except Exception:
-            img_logo = RLImage(logo_path, width=95, height=32)
-        
-        img_logo.hAlign = 'LEFT'
-        
-        # Conteúdo centralizado separado em dois elementos distintos
-        bloco_titulo_central = [
-            Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title),
-            Spacer(1, 2),
-            Paragraph("Laudo de Pneus", style_header_sub)
-        ]
-        
         header_table_data = [
             [img_logo, bloco_titulo_central, Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
         ]
-        t_header = Table(header_table_data, colWidths=[120, 325, 115])
     else:
-        bloco_titulo_central = [
-            Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS</b>", style_header_title),
-            Spacer(1, 2),
-            Paragraph("Laudo de Pneus", style_header_sub)
-        ]
-        
         header_table_data = [
             [Paragraph("<b>COORDENADAS</b>", style_header_title), bloco_titulo_central, Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
         ]
-        t_header = Table(header_table_data, colWidths=[120, 325, 115])
         
+    t_header = Table(header_table_data, colWidths=[120, 325, 115])
     t_header.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#000000')),
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#e5e7eb')),
@@ -294,18 +239,30 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
     ]))
     story.append(t_assinatura)
     
-    # 6. Fotos Específicas do Pneu
-    imagens_pneu = pneu.get('imagens_bytes', [])
-    if imagens_pneu:
+    # 6. Fotos Específicas do Pneu (Com suporte a Rotação Dinâmica)
+    imagens_pneu_objs = pneu.get('imagens_objetos', [])
+    rotacoes_dict = pneu.get('rotacoes_imagens', {})
+    
+    if imagens_pneu_objs:
         story.append(Spacer(1, 10))
         story.append(Paragraph("<b>Registro Fotográfico do Pneu:</b>", style_section_title))
         story.append(Spacer(1, 4))
         
         img_table_data = []
         linha_atual = []
-        for img_bytes in imagens_pneu:
+        for img_file in imagens_pneu_objs:
             try:
-                img_io = io.BytesIO(img_bytes)
+                img_pil = PILImage.open(img_file)
+                
+                # Aplica a rotação escolhida pelo usuário na tela
+                angulo = rotacoes_dict.get(img_file.name, 0)
+                if angulo > 0:
+                    img_pil = img_pil.rotate(-angulo, expand=True)
+                
+                img_io = io.BytesIO()
+                img_pil.save(img_io, format='JPEG')
+                img_io.seek(0)
+                
                 rl_img = RLImage(img_io, width=230, height=145)
                 linha_atual.append(rl_img)
                 if len(linha_atual) == 2:
@@ -313,6 +270,7 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
                     linha_atual = []
             except Exception:
                 pass
+                
         if linha_atual:
             while len(linha_atual) < 2:
                 linha_atual.append("")
@@ -328,21 +286,6 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             ]))
             story.append(t_fotos)
 
-    doc.build(story)
-    buffer.seek(0)
-    return buffer.getvalue()
-
-def gerar_pdf_fallback(texto_bruto, data_str):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-    styles = getSampleStyleSheet()
-    story = [
-        Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS - SGQ 391/15-Rev01</b>", styles['Heading1']),
-        Spacer(1, 10),
-        Paragraph(f"<b>Data:</b> {data_str}", styles['Normal']),
-        Spacer(1, 10),
-        Paragraph(texto_bruto.replace('\n', '<br/>'), styles['Normal'])
-    ]
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
