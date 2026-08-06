@@ -18,7 +18,7 @@ from ai_helper import (
 from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
 
 # NOVA IMPORTAÇÃO ATUALIZADA
-from fvu_keywords import gerar_guia_prompt_fvu, encontrar_fvu_por_descricao
+from fvu_keywords import gerar_prompt_sistema_ia
 
 # Função para carregar a planilha FVU
 @st.cache_data(show_spinner=False)
