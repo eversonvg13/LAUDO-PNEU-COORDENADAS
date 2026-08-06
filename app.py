@@ -461,17 +461,16 @@ if st.session_state.get("inspection_results"):
                         st.markdown("---")
 
                         # ==============================================================
-                        # VINCULAÇÃO INTELIGENTE DE FOTOS (Exibe sempre ao lado)
+                        # VINCULAÇÃO INTELIGENTE DE FOTOS (Com tamanho reduzido)
                         # ==============================================================
                         col_fotos, col_dados = st.columns([1, 2])
 
                         with col_fotos:
-                            st.markdown("##### 🖼️ Foto de Referência:")
+                            st.markdown("##### 🖼️ Foto(s):")
                             
                             imagens_do_pneu = []
                             fotos_ia_brutas = pneu.get("arquivos_fotos", [])
                             
-                            # Tenta achar pelo nome retornado pela IA (case-insensitive)
                             for f_nome in fotos_ia_brutas:
                                 f_lower = str(f_nome).lower().strip()
                                 for img_file in lista_imagens_lote:
@@ -479,7 +478,6 @@ if st.session_state.get("inspection_results"):
                                         if img_file not in imagens_do_pneu:
                                             imagens_do_pneu.append(img_file)
                             
-                            # Fallback automático: se a IA não vinculou pelo nome, distribui as imagens sequencialmente
                             if not imagens_do_pneu and lista_imagens_lote:
                                 total_imgs = len(lista_imagens_lote)
                                 chunk_size = max(1, total_imgs // total_pneus)
@@ -487,10 +485,10 @@ if st.session_state.get("inspection_results"):
                                 end_idx = start_idx + chunk_size if i < total_pneus else total_imgs
                                 imagens_do_pneu = lista_imagens_lote[start_idx:end_idx]
 
-                            # Renderiza as miniaturas ao lado
+                            # Renderiza as miniaturas com largura controlada (ex: 220 pixels)
                             if imagens_do_pneu:
                                 for img_f in imagens_do_pneu:
-                                    st.image(img_f, caption=img_f.name, use_column_width=True)
+                                    st.image(img_f, caption=img_f.name, width=220)
                             else:
                                 st.caption("Nenhuma foto disponível.")
 
