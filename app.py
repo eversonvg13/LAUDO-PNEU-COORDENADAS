@@ -557,6 +557,9 @@ if st.session_state.get("inspection_results"):
                             st.write(f"**Causas Prováveis:** {pneu_exibicao.get('causas_provaveis', '')}")
                             st.write(f"**Observações / Ação:** {pneu_exibicao.get('observacoes', '')}")
 
+                            # Logo antes de chamar a função do PDF, adicione esta linha:
+                                pneu_exibicao['imagens_objetos'] = imagens_do_pneu
+
                             pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
                             st.download_button(
                                 label=f"📄 Baixar PDF - Pneu {fogo_atual_usuario}",
