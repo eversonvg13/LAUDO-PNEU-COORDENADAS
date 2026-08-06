@@ -1,3 +1,19 @@
+import io
+import os
+from PIL import Image as PILImage
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    Image as RLImage
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+
 def gerar_pdf_laudo_pneu(pneu, data_analise):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -254,7 +270,6 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             try:
                 img_pil = PILImage.open(img_file)
                 
-                # Aplica a rotação escolhida pelo usuário na tela
                 angulo = rotacoes_dict.get(img_file.name, 0)
                 if angulo > 0:
                     img_pil = img_pil.rotate(-angulo, expand=True)
@@ -286,6 +301,21 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
             ]))
             story.append(t_fotos)
 
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def gerar_pdf_fallback(texto_bruto, data_str):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph("<b>GRUPO EMPRESARIAL COORDENADAS - SGQ 391/15-Rev01</b>", styles['Heading1']),
+        Spacer(1, 10),
+        Paragraph(f"<b>Data:</b> {data_str}", styles['Normal']),
+        Spacer(1, 10),
+        Paragraph(texto_bruto.replace('\n', '<br/>'), styles['Normal'])
+    ]
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
