@@ -398,7 +398,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
 
 
 # ==============================================================================
-# EXIBIÇÃO DOS RESULTADOS (COM BUSCA FLEXÍVEL E SELETOR MANUAL DE FOTOS)
+# EXIBIÇÃO DOS RESULTADOS (COM MINIATURAS AUTOMÁTICAS AO LADO E CORREÇÃO DE FOGO)
 # ==============================================================================
 if st.session_state.get("inspection_results"):
     st.markdown("---")
@@ -415,11 +415,8 @@ if st.session_state.get("inspection_results"):
             if res["Pneus"]:
                 fvu_options = st.session_state.get("fvu_data", [])
                 tabela_df = st.session_state.dados_relatorio
-                
-                # Cria dicionários de apoio para busca exata e flexível (ignorando maiúsculas/minúsculas)
-                dict_fotos_enviadas = {f.name: f for f in res["Imagens"]}
-                dict_fotos_lower = {f.name.lower(): f for f in res["Imagens"]}
-                lista_nomes_fotos = [f.name for f in res["Imagens"]]
+                lista_imagens_lote = res["Imagens"]
+                total_pneus = len(res["Pneus"])
                 
                 for i, pneu in enumerate(res["Pneus"], start=1):
                     key_fogo_input = f"input_fogo_corrigido_{i}_{res['Timestamp']}"
@@ -428,6 +425,7 @@ if st.session_state.get("inspection_results"):
                         st.session_state[key_fogo_input] = pneu.get('fogo', '')
 
                     with st.container(border=True):
+                        # Cabeçalho com input para corrigir o número de fogo caso a IA tenha falhado
                         col_tit1, col_tit2 = st.columns([2, 1])
                         with col_tit1:
                             fogo_atual_usuario = st.text_input(
@@ -462,41 +460,39 @@ if st.session_state.get("inspection_results"):
 
                         st.markdown("---")
 
-                        # LAYOUT EM DUAS COLUNAS: Esquerda (Fotos e Seletor) | Direita (Dados e Laudo)
+                        # ==============================================================
+                        # VINCULAÇÃO INTELIGENTE DE FOTOS (Exibe sempre ao lado)
+                        # ==============================================================
                         col_fotos, col_dados = st.columns([1, 2])
 
                         with col_fotos:
-                            st.markdown("##### 🖼️ Fotos deste Pneu:")
+                            st.markdown("##### 🖼️ Foto de Referência:")
                             
-                            # Tenta mapear o que a IA trouxe de forma flexível
+                            imagens_do_pneu = []
                             fotos_ia_brutas = pneu.get("arquivos_fotos", [])
-                            fotos_encontradas_nomes = []
+                            
+                            # Tenta achar pelo nome retornado pela IA (case-insensitive)
                             for f_nome in fotos_ia_brutas:
                                 f_lower = str(f_nome).lower().strip()
-                                if f_lower in dict_fotos_lower:
-                                    fotos_encontradas_nomes.append(dict_fotos_lower[f_lower].name)
-
-                            # Chave para o multiselect manual de fotos
-                            key_multiselect_fotos = f"multiselect_fotos_{i}_{res['Timestamp']}"
-                            if key_multiselect_fotos not in st.session_state:
-                                # Define valor inicial com o que a IA achou (ou todas se não achou nada)
-                                st.session_state[key_multiselect_fotos] = fotos_encontradas_nomes if fotos_encontradas_nomes else []
-
-                            # Seletor manual para você escolher ou corrigir as fotos deste pneu se precisar
-                            fotos_selecionadas_usuario = st.multiselect(
-                                "Vincular/Ajustar fotos:",
-                                options=lista_nomes_fotos,
-                                default=st.session_state[key_multiselect_fotos],
-                                key=key_multiselect_fotos,
-                                help="Se a IA associou errado, selecione a foto correta aqui."
-                            )
-
-                            # Exibe as miniaturas das fotos selecionadas (ou todas do lote se nenhuma estiver selecionada)
-                            fotos_para_exibir = fotos_selecionadas_usuario if fotos_selecionadas_usuario else lista_nomes_fotos
+                                for img_file in lista_imagens_lote:
+                                    if f_lower in img_file.name.lower() or img_file.name.lower() in f_lower:
+                                        if img_file not in imagens_do_pneu:
+                                            imagens_do_pneu.append(img_file)
                             
-                            for nome_f in fotos_para_exibir:
-                                if nome_f in dict_fotos_enviadas:
-                                    st.image(dict_fotos_enviadas[nome_f], caption=nome_f, use_column_width=True)
+                            # Fallback automático: se a IA não vinculou pelo nome, distribui as imagens sequencialmente
+                            if not imagens_do_pneu and lista_imagens_lote:
+                                total_imgs = len(lista_imagens_lote)
+                                chunk_size = max(1, total_imgs // total_pneus)
+                                start_idx = (i - 1) * chunk_size
+                                end_idx = start_idx + chunk_size if i < total_pneus else total_imgs
+                                imagens_do_pneu = lista_imagens_lote[start_idx:end_idx]
+
+                            # Renderiza as miniaturas ao lado
+                            if imagens_do_pneu:
+                                for img_f in imagens_do_pneu:
+                                    st.image(img_f, caption=img_f.name, use_column_width=True)
+                            else:
+                                st.caption("Nenhuma foto disponível.")
 
                         with col_dados:
                             if fvu_options:
