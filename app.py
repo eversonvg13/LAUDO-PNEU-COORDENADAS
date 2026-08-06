@@ -398,7 +398,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
 
 
 # ==============================================================================
-# EXIBIÇÃO DOS RESULTADOS (COM MINIATURAS AO LADO E CORREÇÃO DE FOGO)
+# EXIBIÇÃO DOS RESULTADOS (COM BUSCA FLEXÍVEL E SELETOR MANUAL DE FOTOS)
 # ==============================================================================
 if st.session_state.get("inspection_results"):
     st.markdown("---")
@@ -415,18 +415,19 @@ if st.session_state.get("inspection_results"):
             if res["Pneus"]:
                 fvu_options = st.session_state.get("fvu_data", [])
                 tabela_df = st.session_state.dados_relatorio
+                
+                # Cria dicionários de apoio para busca exata e flexível (ignorando maiúsculas/minúsculas)
                 dict_fotos_enviadas = {f.name: f for f in res["Imagens"]}
+                dict_fotos_lower = {f.name.lower(): f for f in res["Imagens"]}
+                lista_nomes_fotos = [f.name for f in res["Imagens"]]
                 
                 for i, pneu in enumerate(res["Pneus"], start=1):
-                    # Chave única para o estado do fogo corrigido pelo usuário
                     key_fogo_input = f"input_fogo_corrigido_{i}_{res['Timestamp']}"
                     
-                    # Inicializa o valor com o fogo detectado pela IA se não existir
                     if key_fogo_input not in st.session_state:
                         st.session_state[key_fogo_input] = pneu.get('fogo', '')
 
                     with st.container(border=True):
-                        # Cabeçalho com input para corrigir o número de fogo caso a IA tenha falhado
                         col_tit1, col_tit2 = st.columns([2, 1])
                         with col_tit1:
                             fogo_atual_usuario = st.text_input(
@@ -435,7 +436,6 @@ if st.session_state.get("inspection_results"):
                                 key=key_fogo_input
                             ).strip()
                         with col_tit2:
-                            # Rebusca na planilha HTML com base no novo número de fogo digitado
                             dados_tabela_atualizados = buscar_dados_relatorio(fogo_atual_usuario, tabela_df)
                             encontrou_planilha = dados_tabela_atualizados is not None
                             
@@ -447,7 +447,6 @@ if st.session_state.get("inspection_results"):
                         pneu_exibicao = pneu.copy()
                         pneu_exibicao['fogo'] = fogo_atual_usuario
 
-                        # Atualiza os dados da tabela se o usuário alterou o fogo
                         if dados_tabela_atualizados is not None:
                             pneu_exibicao["pos"] = dados_tabela_atualizados.get("POS", "")
                             pneu_exibicao["veiculo"] = dados_tabela_atualizados.get("VEICULO", "")
@@ -463,18 +462,41 @@ if st.session_state.get("inspection_results"):
 
                         st.markdown("---")
 
-                        # LAYOUT EM DUAS COLUNAS: Esquerda (Miniaturas das Fotos) | Direita (Dados e Laudo)
+                        # LAYOUT EM DUAS COLUNAS: Esquerda (Fotos e Seletor) | Direita (Dados e Laudo)
                         col_fotos, col_dados = st.columns([1, 2])
 
                         with col_fotos:
                             st.markdown("##### 🖼️ Fotos deste Pneu:")
-                            fotos_pneu_nomes = pneu.get("arquivos_fotos", [])
-                            if fotos_pneu_nomes:
-                                for nome_f in fotos_pneu_nomes:
-                                    if nome_f in dict_fotos_enviadas:
-                                        st.image(dict_fotos_enviadas[nome_f], caption=nome_f, use_column_width=True)
-                            else:
-                                st.caption("Nenhuma foto vinculada automaticamente.")
+                            
+                            # Tenta mapear o que a IA trouxe de forma flexível
+                            fotos_ia_brutas = pneu.get("arquivos_fotos", [])
+                            fotos_encontradas_nomes = []
+                            for f_nome in fotos_ia_brutas:
+                                f_lower = str(f_nome).lower().strip()
+                                if f_lower in dict_fotos_lower:
+                                    fotos_encontradas_nomes.append(dict_fotos_lower[f_lower].name)
+
+                            # Chave para o multiselect manual de fotos
+                            key_multiselect_fotos = f"multiselect_fotos_{i}_{res['Timestamp']}"
+                            if key_multiselect_fotos not in st.session_state:
+                                # Define valor inicial com o que a IA achou (ou todas se não achou nada)
+                                st.session_state[key_multiselect_fotos] = fotos_encontradas_nomes if fotos_encontradas_nomes else []
+
+                            # Seletor manual para você escolher ou corrigir as fotos deste pneu se precisar
+                            fotos_selecionadas_usuario = st.multiselect(
+                                "Vincular/Ajustar fotos:",
+                                options=lista_nomes_fotos,
+                                default=st.session_state[key_multiselect_fotos],
+                                key=key_multiselect_fotos,
+                                help="Se a IA associou errado, selecione a foto correta aqui."
+                            )
+
+                            # Exibe as miniaturas das fotos selecionadas (ou todas do lote se nenhuma estiver selecionada)
+                            fotos_para_exibir = fotos_selecionadas_usuario if fotos_selecionadas_usuario else lista_nomes_fotos
+                            
+                            for nome_f in fotos_para_exibir:
+                                if nome_f in dict_fotos_enviadas:
+                                    st.image(dict_fotos_enviadas[nome_f], caption=nome_f, use_column_width=True)
 
                         with col_dados:
                             if fvu_options:
