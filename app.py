@@ -16,7 +16,9 @@ from ai_helper import (
     extrair_json_da_resposta,
 )
 from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
-from fvu_keywords import FVU_KEYWORDS, encontrar_fvu_por_descricao
+
+# NOVA IMPORTAÇÃO ATUALIZADA
+from fvu_keywords import gerar_guia_prompt_fvu, encontrar_fvu_por_descricao
 
 # Função para carregar a planilha FVU
 @st.cache_data(show_spinner=False)
@@ -233,64 +235,35 @@ with st.container(border=True):
                 dict_fotos_enviadas = {f.name: f for f in uploaded_files}
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
-                linhas_fvu = "\n".join([
-                    f'  {{"codigo": "{x["codigo"]}", "descricao": "{x["descricao"]}", "categoria": "{x["categoria"]}"}}'
-                    for x in fvu_data
-                ])
+                # ==============================================================
+                # NOVO PROMPT COM GLOSSÁRIO MICHELIN INTEGRADO
+                # ==============================================================
+                guia_tecnico_fvu = gerar_guia_prompt_fvu()
+                
                 prompt_instrucoes = f"""
-Você é um inspetor técnico especialista em pneus de frotas pesadas.
-Analise as fotos enviadas e inspecione cada pneu.
+Você é um inspetor técnico sênior credenciado Michelin especialista em pneus de frotas pesadas (caminhões e ônibus).
+Sua missão é realizar a verificação visual de pneus rodados, identificar avarias e classificar o laudo no código FVU exato.
 
-Sua tarefa para cada pneu:
-1. Leia o número de Fogo escrito a giz.
-2. Indique a lista EXATA de nomes dos arquivos de imagem que pertencem a este pneu em "arquivos_fotos".
+ESTRUTURA DE REGRA TÉCNICA E GLOSSÁRIO MICHELIN:
+{guia_tecnico_fvu}
+
+TAREFAS PARA CADA PNEU IDENTIFICADO NAS FOTOS:
+1. Identifique o número de Fogo escrito a giz no pneu.
+2. Liste em "arquivos_fotos" a lista EXATA de nomes dos arquivos que mostram este mesmo pneu.
 3. Identifique a marca e estado geral do pneu.
-4. Descreva detalhadamente o dano visual encontrado.
-5. CLASSIFIQUE o dano escolhendo o código FVU mais adequado da tabela abaixo.
-   Se o pneu estiver em bom estado, use "OK".
+4. Descreva detalhadamente o dano visual encontrado (localização, profundidade, aparência das bordas, presença de arames/cintas).
+5. Siga rigorosamente a ÁRVORE DE DECISÃO para definir o "codigo_fvu_sugerido".
+   Se o pneu não apresentar avarias ou desgaste severo fora do padrão, responda "OK".
 
-TABELA FVU:
-[
-{linhas_fvu}
-]
-
-REGRAS CRÍTICAS DE CLASSIFICAÇÃO (leia com atenção):
-
-BANDA DE RODAGEM:
-- 48D = banda LISA, CARECA, sem sulcos, desgaste total/extremo. Se a banda estiver calva → sempre 48D, nunca 45B.
-- 45B = dano PONTUAL na banda (corte, rasgo por objeto/prego). NÃO use para desgaste generalizado.
-- 45D = desgaste IRREGULAR (mais desgastado de um lado), causado por problemas de alinhamento.
-
-FLANCO (lateral do pneu):
-- 45F = furo/ferida acidental por objeto pontiagudo no flanco.
-- 45G = choque/beliscão no flanco por buraco ou meio-fio, sem destruição total.
-- 70R = RACHADURA ou TRINCA profunda no flanco ou zona baixa. Visual: fissura/corte profundo no lateral.
-- 70J = flanco ou carcaça DESTRUÍDA com lonas metálicas/arames expostos e desenrolados. Visual: pneu explodido/aberto com estrutura interna visível. NÃO confundir com 45G (que é apenas um choque/amassado).
-
-TALÃO (borda interna que encaixa na roda):
-- 70J = desenrolamento da lona carcaça — estrutura interna completamente exposta e destruída.
-- 70K = separação do reforço do talão da roda/aro.
-- 70L = ruptura da lona carcaça especificamente no talão.
-- 70Q = deformação/alteração do talão sem ruptura.
-- 70R = rachadura/trinca na zona baixa ou flanco.
-
-MONTAGEM/DESMONTAGEM:
-- 71J = marca de alavanca ou ferramenta durante montagem/desmontagem. NÃO use quando o dano é por flexão ou uso.
-
-RESUMO DOS MAIS CONFUNDIDOS:
-- Flanco destruído com lonas expostas → 70J (não 45G, não 70L)
-- Rachadura/trinca no flanco → 70R (não 71J, não 70J)
-- Banda lisa/careca → 48D (não 45B)
-
-Responda SOMENTE com um array JSON válido, sem texto adicional:
+FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
 [
   {{
     "fogo": "string",
     "marca": "string",
     "sulco": "string",
-    "arquivos_fotos": ["arquivo1.jpg"],
-    "descricao_dano_ia": "string",
-    "codigo_fvu_sugerido": "ex: 45D ou OK",
+    "arquivos_fotos": ["foto1.jpg"],
+    "descricao_dano_ia": "string com descrição técnica rica",
+    "codigo_fvu_sugerido": "ex: 48D ou OK",
     "confianca": "Alta | Média | Baixa"
   }}
 ]
