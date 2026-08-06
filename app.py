@@ -4,9 +4,7 @@ import time
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-from PIL import Image 
-import montar_prompt_com_fvu, selecionar_fvu
-
+from PIL import Image
 
 # Função para carregar a planilha FVU
 @st.cache_data(show_spinner=False)
@@ -54,8 +52,9 @@ if "lista_chaves" not in st.session_state:
     st.session_state.lista_chaves = chaves
     st.session_state.indice_chave_atual = 0
 
-# Função auxiliar de match inteligente entre a descrição da IA e a tabela FVU
-# Tabela de palavras-chave por código FVU
+# ==============================================================================
+# ALTERAÇÃO 1 — Tabela de palavras-chave + nova função encontrar_fvu_por_descricao
+# ==============================================================================
 FVU_KEYWORDS = {
     "45B": {"pos": ["topo", "choque", "impacto", "deterioração", "objeto"], "neg": ["flanco", "talão", "ressulc"]},
     "45F": {"pos": ["flanco", "ferida", "acidental", "furo", "pontiagudo", "guia", "meio-fio"], "neg": ["topo", "talão", "desgaste", "ressulc"]},
@@ -77,10 +76,7 @@ FVU_KEYWORDS = {
     "75A": {"pos": ["químic", "físic", "óleo", "combustível", "corrosão"], "neg": []},
 }
 
-# Tabela de palavras-chave por código FVU
-codigo_ia = str(item.get("codigo_fvu_sugerido", "")).strip().upper()
-fvu_direto = next((x for x in fvu_data if x["codigo"].strip().upper() == codigo_ia), None)
-fvu_selecionado = fvu_direto if fvu_direto else encontrar_fvu_por_descricao(desc_ia, fvu_data)
+def encontrar_fvu_por_descricao(descricao_ia, fvu_data):
     if not descricao_ia or not fvu_data:
         return fvu_data[0] if fvu_data else None
 
@@ -289,9 +285,13 @@ with st.container(border=True):
                 dict_fotos_enviadas = {f.name: f for f in uploaded_files}
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
-                linhas_fvu = "\n".join([f'  {{"codigo": "{x["codigo"]}", "descricao": "{x["descricao"]}", "categoria": "{x["categoria"]}"}}' for x in fvu_data])
-                
-                
+                # ==============================================================
+                # ALTERAÇÃO 2 — Prompt com tabela FVU embutida
+                # ==============================================================
+                linhas_fvu = "\n".join([
+                    f'  {{"codigo": "{x["codigo"]}", "descricao": "{x["descricao"]}", "categoria": "{x["categoria"]}"}}'
+                    for x in fvu_data
+                ])
                 prompt_instrucoes = f"""
 Você é um inspetor técnico especialista em pneus de frotas pesadas.
 Analise as fotos enviadas e inspecione cada pneu.
@@ -311,7 +311,7 @@ TABELA FVU:
 
 DICA: BANDA DE RODAGEM = parte que toca o solo. FLANCO = lateral. TALÃO = borda interna que encaixa na roda.
 
-Responda SOMENTE com um array JSON válido:
+Responda SOMENTE com um array JSON válido, sem texto adicional:
 [
   {{
     "fogo": "string",
@@ -324,6 +324,13 @@ Responda SOMENTE com um array JSON válido:
   }}
 ]
 """
+
+                conteudo_requisicao = []
+                for f in sorted_files:
+                    bytes_comprimidos = comprimir_imagem(f.getvalue())
+                    conteudo_requisicao.append(f"Arquivo: {f.name}")
+                    conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
+                conteudo_requisicao.append(prompt_instrucoes)
 
                 # ==============================================================
                 # SISTEMA DE ROTAÇÃO AUTOMÁTICA DE CHAVES E RETRY
@@ -376,7 +383,12 @@ Responda SOMENTE com um array JSON válido:
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
                         
                         desc_ia = item.get("descricao_dano_ia", "")
-                        fvu_selecionado = selecionar_fvu(item, fvu_data)
+                        # ==============================================================
+                        # ALTERAÇÃO 3 — Usa código sugerido pela IA; fallback pro matching
+                        # ==============================================================
+                        codigo_ia = str(item.get("codigo_fvu_sugerido", "")).strip().upper()
+                        fvu_direto = next((x for x in fvu_data if x["codigo"].strip().upper() == codigo_ia), None)
+                        fvu_selecionado = fvu_direto if fvu_direto else encontrar_fvu_por_descricao(desc_ia, fvu_data)
                         
                         if fvu_selecionado:
                             codigo_fvu = fvu_selecionado["codigo"]
