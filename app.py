@@ -5,6 +5,17 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from PIL import Image
+import google.generativeai as genai
+
+# Importações dos módulos locais
+from parser import parse_relatorio_html, CAMPOS_FIXOS
+from ai_helper import (
+    comprimir_imagem,
+    obter_modelo_estavel,
+    buscar_dados_relatorio,
+    extrair_json_da_resposta,
+)
+from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
 
 # Função para carregar a planilha FVU
 @st.cache_data(show_spinner=False)
@@ -53,27 +64,202 @@ if "lista_chaves" not in st.session_state:
     st.session_state.indice_chave_atual = 0
 
 # ==============================================================================
-# Glossário FVU, prompt e regras determinísticas agora vivem em fvu_glossario.py
+# TABELA DE PALAVRAS-CHAVE E MATCHING FVU
 # ==============================================================================
-from fvu_glossario import (
-    montar_prompt_inspecao,
-    encontrar_fvu_por_descricao,
-    aplicar_regras_deterministicas,
-)
+FVU_KEYWORDS = {
+    # 45B — motorista sobe em obstáculo alto (meio-fio, cabeçeira de ponte, pedra)
+    # com a BANDA DE RODAGEM. Corte atravessa de flanco a flanco na banda. Corte profundo transversal.
+    "45B": {
+        "pos": ["corte banda", "corte transversal", "corte de flanco a flanco", "ruptura banda",
+                "banda rompida", "corte profundo banda", "impacto obstáculo", "meio-fio banda",
+                "cabeçeira", "corte na banda de rodagem", "rasgo banda", "objeto banda"],
+        "neg": ["flanco", "talão", "ressulc", "desgaste", "liso", "careca", "calvo",
+                "sem sulco", "cinta", "irregular", "rachadura flanco"],
+    },
+    # 45F — corte HORIZONTAL pequeno no flanco, geralmente único e retilíneo, com algumas ranhuras.
+    "45F": {
+        "pos": ["corte horizontal flanco", "corte retilíneo flanco", "corte pequeno flanco",
+                "corte lateral", "ranhura flanco", "ferida flanco", "furo flanco",
+                "corte flanco", "incisão flanco", "objeto cortante flanco"],
+        "neg": ["talão", "ressulc", "banda de rodagem", "desgaste", "cinta",
+                "grande", "arrancou", "pedaço", "circunferencial", "rachadura"],
+    },
+    # 45G — parecido com 45F mas o corte é MAIOR, pode arrancar pedaços do flanco.
+    "45G": {
+        "pos": ["corte grande flanco", "rasgo flanco", "arrancou pedaço flanco",
+                "dano extenso flanco", "corte profundo flanco", "flanco danificado gravemente",
+                "pedaço arrancado flanco", "lesão grande flanco", "impacto flanco severo"],
+        "neg": ["talão", "ressulc", "banda de rodagem", "desgaste", "cinta",
+                "horizontal pequeno", "ranhura", "lonas expostas", "destruído", "rachadura"],
+    },
+    # 45N — ressulcagem EXECUTADA mas fora dos parâmetros do CONTRAN (profundidade/largura errada).
+    # Só em pneu SEM reforma (desenho original do fabricante).
+    "45N": {
+        "pos": ["ressulcagem incorreta", "ressulcagem fora do padrão", "ressulcagem mal executada",
+                "ressulcagem irregular", "ressulco incorreto", "frieza fora do padrão",
+                "sulco fora da norma", "ressulcagem inadequada"],
+        "neg": ["não ressulcado", "sem ressulcagem", "reforma"],
+    },
+    # 45R — NÃO realizou a ressulcagem quando deveria. Só em pneu SEM reforma.
+    "45R": {
+        "pos": ["não ressulcado", "sem ressulcagem", "ressulcagem não realizada",
+                "pneu não ressulcado", "falta de ressulcagem", "ressulcagem ausente",
+                "deveria ter sido ressulcado"],
+        "neg": ["incorreta", "mal executada", "fora do padrão", "reforma"],
+    },
+    # 45D — desgaste IRREGULAR: um lado da banda mais desgastado que o outro (diferença nos sulcos).
+    # NÃO há cinta aparente. Se atingiu a cinta → obrigatoriamente 48D.
+    "45D": {
+        "pos": ["desgaste irregular", "desgaste de um lado", "sulco mais baixo de um lado",
+                "desgaste assimétrico", "ombro desgastado", "desgaste lateral",
+                "diferença de sulco", "alinhamento", "desgaste desigual", "um lado mais desgastado"],
+        "neg": ["cinta aparente", "cinta exposta", "cinta visível", "liso", "careca",
+                "sem sulco", "calvo", "desgaste total", "extremo"],
+    },
+    # 46F — agressões REPETIDAS no mesmo ponto do flanco (circunferenciais).
+    # Ex: peça do veículo solta rodando no pneu, ou pedra presa entre duplos.
+    "46F": {
+        "pos": ["agressão repetida flanco", "dano circunferencial flanco", "marcas repetidas flanco",
+                "pedra entre duplos", "peça solta contato pneu", "perfuração circunferencial",
+                "fissura circunferencial flanco", "ranhuras circunferenciais", "dano ao longo do flanco",
+                "abrasão repetida flanco", "sulco circunferencial flanco"],
+        "neg": ["talão", "banda de rodagem", "ressulc", "desgaste", "corte único", "corte pontual"],
+    },
+    # 48D — cintas/fios de aço APARENTES. Não necessariamente desgaste irregular nos sulcos.
+    # Se desgaste irregular atingiu a cinta → também é 48D.
+    "48D": {
+        "pos": ["cinta aparente", "cinta exposta", "cinta visível", "fio de aço exposto",
+                "aço aparente", "careca", "calvo", "liso", "sem sulco", "banda lisa",
+                "desgaste até a cinta", "lona exposta banda", "desgaste extremo",
+                "desgaste total banda", "sulco inexistente", "limite de desgaste",
+                "indicador de desgaste", "desgaste excessivo"],
+        "neg": ["flanco", "talão", "ressulc", "rachadura", "corte"],
+    },
+    # 52B — rodou com BAIXA PRESSÃO mas sem destruição externa visível.
+    # Dano aparece INTERNAMENTE: ranhuras ou rachaduras no liner (butílico) interno.
+    "52B": {
+        "pos": ["baixa pressão", "liner danificado", "butílico danificado", "dano interno",
+                "ranhura interna", "rachadura interna", "flexão por baixa pressão",
+                "marca interna", "linha interna rachada", "butil rachado", "dano no liner"],
+        "neg": ["sem ar", "vazio", "rodou vazio", "pó interno", "esfarelamento",
+                "destruído externamente", "flanco sem estrutura"],
+    },
+    # 52H — rodou completamente SEM AR. Dano externo e/ou interno grave.
+    # Internamente: pó (borracha esfarelada pela fricção). Externamente: flanco destruído sem estrutura.
+    "52H": {
+        "pos": ["rodou sem ar", "pó interno", "borracha esfarelada", "esfarelamento interno",
+                "flanco sem estrutura", "sem ar", "vazio", "rodou vazio",
+                "destruído externamente", "flanco colapsado", "fricção interna",
+                "pneu murcho rodou", "pressão zero rodou"],
+        "neg": ["baixa pressão", "dano somente interno", "liner", "butílico", "sobrecarga"],
+    },
+    # 70J — lona de REFORÇO DO TALÃO se desprende do encordoamento por aquecimento excessivo/abrupto.
+    # Visualmente: talão muito destruído, dano se estende para parte do flanco. Aquecimento é a causa.
+    "70J": {
+        "pos": ["lona talão desprendida", "reforço talão desprendido", "encordoamento talão",
+                "talão destruído", "aquecimento talão", "separação lona talão",
+                "talão aberto", "lona reforço solta", "talão danificado gravemente",
+                "dano talão e flanco", "talão afetado flanco"],
+        "neg": ["rachadura", "trinca", "crack", "montagem", "desmontagem", "alavanca",
+                "cordoeis rompidos", "zona baixa"],
+    },
+    # 70K — rachadura CIRCUNFERENCIAL no flanco bem acima do talão.
+    # Parece com 45F mas é uma rachadura oscilante (como parede rachada), não corte retilíneo.
+    "70K": {
+        "pos": ["rachadura circunferencial flanco", "trinca circunferencial flanco",
+                "rachadura horizontal flanco", "rachadura oscilante flanco",
+                "rachadura acima talão", "fissura circunferencial lateral",
+                "rachadura parede flanco", "crack circunferencial flanco"],
+        "neg": ["corte retilíneo", "corte pontual", "talão", "zona baixa", "montagem",
+                "pequeno corte", "ranhura", "banda"],
+    },
+    # 70L — rompimento dos CORDOÉIS (encordoamento) do talão. Parecido com 70J mas aqui os cordoéis rompem.
+    "70L": {
+        "pos": ["cordoéis rompidos", "encordoamento rompido", "cordoéis talão rompidos",
+                "ruptura cordoéis", "cordão talão rompido", "arames talão rompidos",
+                "encordoamento talão partido"],
+        "neg": ["rachadura", "trinca", "zona baixa", "montagem", "desmontagem",
+                "lona reforço", "circunferencial"],
+    },
+    # 70Q — zona do talão ABAIXA/deforma sem rachadura. Deixa o pneu suscetível ao 70R.
+    # NÃO há rachadura na zona baixa — apenas afundamento/deformação.
+    "70Q": {
+        "pos": ["zona talão abaixada", "talão afundado", "zona baixa deformada",
+                "talão deformado sem rachadura", "afundamento talão", "talão baixo",
+                "deformação zona talão", "talão sem rachadura deformado"],
+        "neg": ["rachadura", "trinca", "crack", "fissura", "pé de galinha",
+                "ruptura", "cordoéis", "montagem"],
+    },
+    # 70R — rachadura na ZONA BAIXA DO TALÃO. O famoso "pé de galinha no talão".
+    # Diferencia do 70Q justamente por TER rachadura. Pode ser grande ou pequena.
+    "70R": {
+        "pos": ["rachadura zona baixa", "pé de galinha", "trinca zona baixa",
+                "rachadura talão", "fissura zona baixa", "crack zona baixa talão",
+                "rachadura base talão", "trinca base talão", "pé de galinha talão",
+                "rachadura na zona do talão"],
+        "neg": ["flanco", "circunferencial", "montagem", "desmontagem",
+                "cordoéis", "lona reforço", "destruído"],
+    },
+    # 71J — borracheiro danifica o talão na montagem/desmontagem.
+    # Fica próximo da parte interna do pneu, no alto do talão (assentamento/vedação da roda).
+    # Talão em bom estado — zona baixa sem deformação funda.
+    "71J": {
+        "pos": ["dano montagem", "dano desmontagem", "talão danificado montagem",
+                "marca ferramenta talão", "alavanca talão", "corte montagem",
+                "dano assentamento roda", "região vedação talão danificada",
+                "alto talão danificado", "ferramental talão"],
+        "neg": ["rachadura", "trinca", "zona baixa funda", "aquecimento",
+                "flanco", "circunferencial", "cordoéis"],
+    },
+    # 71K — parecido com 71J mas o talão já estava aquecido/fragilizado antes da montagem/desmontagem.
+    # Diferencial: zona baixa do talão está FUNDA (deformada). Se zona baixa funda → 71K; se não → 71J.
+    "71K": {
+        "pos": ["talão aquecido", "talão fragilizado", "quebra talão aquecido",
+                "zona baixa funda", "zona baixa deformada profunda", "talão fundo",
+                "pneu aquecido desmontagem", "quebra montagem talão fragilizado"],
+        "neg": ["rachadura", "trinca", "pé de galinha", "flanco", "circunferencial"],
+    },
+    # 75A — contato prolongado com óleo/derivado de petróleo.
+    # Flanco ESTUFADO para fora (visível de cima). Manchas de óleo na lateral.
+    "75A": {
+        "pos": ["flanco estufado", "estufamento lateral", "óleo flanco", "manchado óleo",
+                "absorção óleo", "derivado petróleo", "contato óleo", "lateral estufada",
+                "flanco inchado", "mancha derivado", "óleo na lateral", "borracha estufada"],
+        "neg": ["corte", "rachadura", "desgaste", "talão", "banda"],
+    },
+}
+
+def encontrar_fvu_por_descricao(descricao_ia, fvu_data):
+    if not descricao_ia or not fvu_data:
+        return fvu_data[0] if fvu_data else None
+
+    desc_lower = descricao_ia.lower()
+    melhor_match = None
+    max_score = -999
+
+    for item in fvu_data:
+        codigo = item["codigo"].strip().upper()
+        kw = FVU_KEYWORDS.get(codigo, {})
+        score = 0
+        for termo in kw.get("pos", []):
+            if termo in desc_lower:
+                score += 3
+        for termo in kw.get("neg", []):
+            if termo in desc_lower:
+                score -= 4
+        texto_fvu = (item["descricao"] + " " + item["categoria"]).lower()
+        for palavra in [p for p in texto_fvu.split() if len(p) > 3]:
+            if palavra in desc_lower:
+                score += 1
+        if score > max_score:
+            max_score = score
+            melhor_match = item
+
+    return melhor_match if melhor_match and max_score > 0 else fvu_data[0]
 
 @st.cache_data(show_spinner=False)
 def gerar_pdf_em_cache(pneu_dict, data_str):
     return gerar_pdf_laudo_pneu(pneu_dict, data_str)
-
-# Importações dos módulos locais
-from parser import parse_relatorio_html, CAMPOS_FIXOS
-from ai_helper import (
-    comprimir_imagem,
-    obter_modelo_estavel,
-    buscar_dados_relatorio,
-    extrair_json_da_resposta,
-)
-from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
 
 def get_image_base64(path):
     if os.path.exists(path):
@@ -231,8 +417,6 @@ with st.container(border=True):
                 st.session_state.inspection_results = []
 
             try:
-                import google.generativeai as genai
-                
                 texto_status = st.empty()
                 texto_status.info("Inspecionando imagens com alta precisão visual...")
 
@@ -242,18 +426,68 @@ with st.container(border=True):
                 dict_fotos_enviadas = {f.name: f for f in uploaded_files}
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
 
-                # ==============================================================
-                # PROMPT — montado pelo módulo fvu_glossario
-                # ==============================================================
-                mapa_reformas = {}
-                df_rel = st.session_state.dados_relatorio
-                if not df_rel.empty:
-                    for _, r in df_rel.iterrows():
-                        fogo = str(r.get("FOGO", "")).strip()
-                        if fogo:
-                            mapa_reformas[fogo] = str(r.get("REFORMA", r.get("Re", "0"))).strip() or "0"
+                linhas_fvu = "\n".join([
+                    f'  {{"codigo": "{x["codigo"]}", "descricao": "{x["descricao"]}", "categoria": "{x["categoria"]}"}}'
+                    for x in fvu_data
+                ])
+                prompt_instrucoes = f"""
+Você é um inspetor técnico especialista em pneus de frotas pesadas.
+Analise as fotos enviadas e inspecione cada pneu.
 
-                prompt_instrucoes = montar_prompt_inspecao(fvu_data, mapa_reformas)
+Sua tarefa para cada pneu:
+1. Leia o número de Fogo escrito a giz.
+2. Indique a lista EXATA de nomes dos arquivos de imagem que pertencem a este pneu em "arquivos_fotos".
+3. Identifique a marca e estado geral do pneu.
+4. Descreva detalhadamente o dano visual encontrado.
+5. CLASSIFIQUE o dano escolhendo o código FVU mais adequado da tabela abaixo.
+   Se o pneu estiver em bom estado, use "OK".
+
+TABELA FVU:
+[
+{linhas_fvu}
+]
+
+REGRAS CRÍTICAS DE CLASSIFICAÇÃO (leia com atenção):
+
+BANDA DE RODAGEM:
+- 48D = banda LISA, CARECA, sem sulcos, desgaste total/extremo. Se a banda estiver calva → sempre 48D, nunca 45B.
+- 45B = dano PONTUAL na banda (corte, rasgo por objeto/prego). NÃO use para desgaste generalizado.
+- 45D = desgaste IRREGULAR (mais desgastado de um lado), causado por problemas de alinhamento.
+
+FLANCO (lateral do pneu):
+- 45F = furo/ferida acidental por objeto pontiagudo no flanco.
+- 45G = choque/beliscão no flanco por buraco ou meio-fio, sem destruição total.
+- 70R = RACHADURA ou TRINCA profunda no flanco ou zona baixa. Visual: fissura/corte profundo no lateral.
+- 70J = flanco ou carcaça DESTRUÍDA com lonas metálicas/arames expostos e desenrolados. Visual: pneu explodido/aberto com estrutura interna visível. NÃO confundir com 45G (que é apenas um choque/amassado).
+
+TALÃO (borda interna que encaixa na roda):
+- 70J = desenrolamento da lona carcaça — estrutura interna completamente exposta e destruída.
+- 70K = separação do reforço do talão da roda/aro.
+- 70L = ruptura da lona carcaça especificamente no talão.
+- 70Q = deformação/alteração do talão sem ruptura.
+- 70R = rachadura/trinca na zona baixa ou flanco.
+
+MONTAGEM/DESMONTAGEM:
+- 71J = marca de alavanca ou ferramenta durante montagem/desmontagem. NÃO use quando o dano é por flexão ou uso.
+
+RESUMO DOS MAIS CONFUNDIDOS:
+- Flanco destruído com lonas expostas → 70J (não 45G, não 70L)
+- Rachadura/trinca no flanco → 70R (não 71J, não 70J)
+- Banda lisa/careca → 48D (não 45B)
+
+Responda SOMENTE com um array JSON válido, sem texto adicional:
+[
+  {{
+    "fogo": "string",
+    "marca": "string",
+    "sulco": "string",
+    "arquivos_fotos": ["arquivo1.jpg"],
+    "descricao_dano_ia": "string",
+    "codigo_fvu_sugerido": "ex: 45D ou OK",
+    "confianca": "Alta | Média | Baixa"
+  }}
+]
+"""
 
                 conteudo_requisicao = []
                 for f in sorted_files:
@@ -289,12 +523,10 @@ with st.container(border=True):
                         if "429" in erro_str or "ResourceExhausted" in type(e).__name__ or "quota" in erro_str.lower():
                             tentativa_chave += 1
                             if tentativa_chave < total_chaves:
-                                # Alterna para a próxima chave da lista de forma circular
                                 st.session_state.indice_chave_atual = (st.session_state.indice_chave_atual + 1) % total_chaves
                                 texto_status.warning(f"⚠️ Cota esgotada na chave atual (Erro 429). Alternando automaticamente para a próxima chave ({tentativa_chave}/{total_chaves})...")
                                 time.sleep(2)
                             else:
-                                # Se todas as chaves falharam por 429, faz fallback para espera progressiva na chave atual
                                 texto_status.warning(f"⚠️ Todas as chaves atingiram o limite de cota. Aguardando 15s para nova tentativa...")
                                 time.sleep(15)
                                 raise RuntimeError(f"Limite de cota excedido em todas as chaves disponíveis. Detalhes: {e}")
@@ -313,23 +545,9 @@ with st.container(border=True):
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
                         
                         desc_ia = item.get("descricao_dano_ia", "")
-
-                        # ==============================================================
-                        # Regras determinísticas aplicadas sobre a resposta da IA
-                        # ==============================================================
-                        n_reformas_pneu = "0"
-                        if dados_tabela is not None:
-                            n_reformas_pneu = str(
-                                dados_tabela.get("REFORMA", dados_tabela.get("Re", dados_tabela.get("RE", "0")))
-                            ).strip() or "0"
-
-                        codigo_ia, ajustes = aplicar_regras_deterministicas(item, n_reformas_pneu)
-
-                        fvu_direto = next(
-                            (x for x in fvu_data if x["codigo"].strip().upper() == codigo_ia.strip().upper()),
-                            None,
-                        )
-                        fvu_selecionado = fvu_direto or encontrar_fvu_por_descricao(desc_ia, fvu_data)
+                        codigo_ia = str(item.get("codigo_fvu_sugerido", "")).strip().upper()
+                        fvu_direto = next((x for x in fvu_data if x["codigo"].strip().upper() == codigo_ia), None)
+                        fvu_selecionado = fvu_direto if fvu_direto else encontrar_fvu_por_descricao(desc_ia, fvu_data)
                         
                         if fvu_selecionado:
                             codigo_fvu = fvu_selecionado["codigo"]
@@ -377,10 +595,6 @@ with st.container(border=True):
                             "observacoes": texto_acao,
                             "acao_recomendada": texto_acao,
                             "confianca": item.get("confianca", ""),
-                            "evidencia": item.get("evidencia", ""),
-                            "descartados": item.get("descartados", []),
-                            "foto_faltante": item.get("foto_faltante", ""),
-                            "ajustes_regras": ajustes,
                             "fogo_localizado_na_planilha": dados_tabela is not None,
                             "imagens_bytes": imagens_bytes_pneu,
                         }
@@ -476,19 +690,6 @@ if st.session_state.get("inspection_results"):
                             st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
                             st.write(f"**KM TOTAL:** {pneu_exibicao.get('km_total', '')}")
                             st.write(f"**Confiança IA:** {pneu_exibicao.get('confianca', '')}")
-
-                        if pneu_exibicao.get("evidencia"):
-                            st.info(f"🔎 **Evidência que decidiu o código:** {pneu_exibicao['evidencia']}")
-                        if pneu_exibicao.get("descartados"):
-                            descartes = ", ".join(
-                                f"{d.get('codigo')} ({d.get('motivo')})" for d in pneu_exibicao["descartados"]
-                            )
-                            st.caption(f"Códigos descartados: {descartes}")
-                        if pneu_exibicao.get("ajustes_regras"):
-                            for a in pneu_exibicao["ajustes_regras"]:
-                                st.warning(f"⚙️ Regra aplicada: {a}")
-                        if pneu_exibicao.get("foto_faltante"):
-                            st.error(f"📷 Foto faltante para decidir com segurança: {pneu_exibicao['foto_faltante']}")
 
                         st.write(f"**Laudo / Dano Relatado:** {pneu_exibicao.get('danos', '')}")
                         st.write(f"**Causas Prováveis:** {pneu_exibicao.get('causas_provaveis', '')}")
