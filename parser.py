@@ -62,7 +62,7 @@ def parse_relatorio_html(file_bytes):
                 fogo = registro.get("FOGO", "")
                 if veiculo.isdigit() and fogo.isdigit():
                     # Mapeia com segurança a quantidade de reforma (prioriza RE, RECAP1, ou VIDA1 se houver)
-                    reforma_val = registro.get("RE", "0").strip() or "0"
+                    reforma_val = registro.get("RE", "").strip() or "0"
                     
                     reg_dict = {
                         "FOGO": fogo,
