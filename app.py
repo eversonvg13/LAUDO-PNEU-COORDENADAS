@@ -7,7 +7,7 @@ import streamlit as st
 from PIL import Image
 import google.generativeai as genai
 import streamlit as st
-from data_utils import salvar_no_excel  # Importa a função do seu novo módulo
+from data_utils import salvar_no_onedrive
 
 # Importações dos módulos locais
 from parser import parse_relatorio_html, CAMPOS_FIXOS
