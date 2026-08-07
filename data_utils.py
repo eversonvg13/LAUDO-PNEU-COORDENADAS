@@ -1,5 +1,4 @@
 import requests
-import streamlit as st
 
 WEBHOOK_URL = "https://hook.us2.make.com/cbfm6m6pmbcpzuwfssj24e3427vi4fh3"
 
@@ -10,17 +9,17 @@ def salvar_no_onedrive(dados_ia):
             "cod_medida":   dados_ia.get("cod_medida", ""),
             "medida":       dados_ia.get("medida", ""),
             "veiculo":      dados_ia.get("veiculo", ""),
-            "posicao":      dados_ia.get("posicao", ""),
+            "posicao":      dados_ia.get("pos", ""),          # era "posicao", agora "pos"
             "cod_unidade":  dados_ia.get("cod_unidade", ""),
-            "data_retirada":dados_ia.get("data_retirada", ""),
+            "data_retirada":dados_ia.get("retirada", ""),     # era "data_retirada", agora "retirada"
             "analise":      dados_ia.get("analise", ""),
             "nr_ref":       dados_ia.get("nr_ref", ""),
-            "km_posicao":   dados_ia.get("km_posicao", ""),
+            "km_posicao":   dados_ia.get("km_pos", ""),       # era "km_posicao", agora "km_pos"
             "km_total":     dados_ia.get("km_total", ""),
             "valor":        dados_ia.get("valor", ""),
             "retorno":      dados_ia.get("retorno", ""),
             "desconto":     dados_ia.get("desconto", ""),
-            "fvu":          dados_ia.get("fvu", ""),
+            "fvu":          dados_ia.get("codigo_fvu", ""),   # era "fvu", agora "codigo_fvu"
             "cod_relator":  dados_ia.get("cod_relator", ""),
         }
 
