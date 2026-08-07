@@ -609,28 +609,36 @@ if st.session_state.get("inspection_results"):
                     file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf",
                 )
+
 # ==============================================================================
 # SALVAR NA PLANILHA DE LAUDOS
 # ==============================================================================
 st.markdown("---")
 if st.button("Salvar Laudo na Planilha", use_container_width=True):
-    # Verifica se existem resultados processados na sessão
     if "inspection_results" in st.session_state and st.session_state.inspection_results:
-        # Pega o último lote de pneus processados
         ultimo_lote = st.session_state.inspection_results[-1]
         pneus_para_salvar = ultimo_lote.get("Pneus", [])
         
         if pneus_para_salvar:
-            try:
-                # Envia os dados corretos para a função de salvamento
-                sucesso, mensagem = salvar_no_onedrive(pneus_para_salvar)
-                
-                if sucesso:
-                    st.success("✅ Laudo gravado no Excel com sucesso!")
-                else:
-                    st.error(f"❌ Erro ao salvar: {mensagem}")
-            except Exception as e:
-                st.error(f"❌ Erro inesperado ao executar a função de salvamento: {e}")
+            sucessos = 0
+            erros = []
+            
+            # Percorre cada pneu individualmente da lista e salva na planilha
+            for pneu in pneus_para_salvar:
+                try:
+                    sucesso, mensagem = salvar_no_onedrive(pneu)
+                    if sucesso:
+                        sucessos += 1
+                    else:
+                        erros.append(f"Pneu {pneu.get('fogo', 'N/D')}: {mensagem}")
+                except Exception as e:
+                    erros.append(f"Pneu {pneu.get('fogo', 'N/D')}: {e}")
+            
+            if sucessos > 0:
+                st.success(f"✅ {sucessos} pneu(s) gravado(s) no Excel com sucesso!")
+            if erros:
+                for err in erros:
+                    st.error(f"❌ {err}")
         else:
             st.warning("⚠️ Nenhum dado estruturado de pneu encontrado para salvar.")
     else:
