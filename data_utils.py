@@ -10,7 +10,7 @@ COD_UNIDADE = {
     "MARIA GORETTI": "16",
     "NEVES":         "520",
     "SARZEDO":       "61",
-    "UBERLANDIA":    "6",
+    "UBERLANDIA":    "56",
     "VENEZA":        "990",
 }
 
