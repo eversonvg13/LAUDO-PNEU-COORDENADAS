@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 import google.generativeai as genai
+import streamlit as st
+from data_utils import salvar_no_excel  # Importa a função do seu novo módulo
 
 # Importações dos módulos locais
 from parser import parse_relatorio_html, CAMPOS_FIXOS
@@ -607,3 +609,15 @@ if st.session_state.get("inspection_results"):
                     file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf",
                 )
+# Salvar na Planilha de Laudos:
+
+if st.button("Salvar Laudo no Banco"):
+    # O caminho do arquivo (use o 'r' antes da string para evitar erros de barra)
+    caminho_completo = r"C:\Users\SEU_USUARIO\OneDrive\Pasta\sua_planilha.xlsx"
+    
+    sucesso, mensagem = salvar_no_excel(caminho_completo, dados_json_da_ia)
+    
+    if sucesso:
+        st.success("Laudo gravado no Excel com sucesso!")
+    else:
+        st.error(f"Erro ao salvar: {mensagem}")
