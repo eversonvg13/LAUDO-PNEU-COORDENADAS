@@ -615,7 +615,7 @@ if st.button("Salvar Laudo na Planilha"):
     # O caminho do arquivo (use o 'r' antes da string para evitar erros de barra)
     caminho_completo = r"C:\Users\SEU_USUARIO\OneDrive\Pasta\sua_planilha.xlsx"
     
-    sucesso, mensagem = salvar_no_excel(caminho_completo, dados_json_da_ia)
+    sucesso, mensagem = salvar_no_onedrive(dados_json_da_ia)
     
     if sucesso:
         st.success("Laudo gravado no Excel com sucesso!")
