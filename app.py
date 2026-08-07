@@ -577,16 +577,8 @@ if st.session_state.get("inspection_results"):
                                     index=idx_local,
                                     key=f"select_local_{i}_{fogo_atual_usuario}_{res['Timestamp']}"
                                 )
-                                # Atualiza o dicionário com a unidade selecionada
                                 pneu_exibicao['local'] = novo_local
-                                novo_local = st.selectbox(
-    "📍 **LOCAL/UNIDADE:**",
-    options=unidades_disponiveis,
-    index=idx_local,
-    key=f"select_local_{i}_{fogo_atual_usuario}_{res['Timestamp']}"
-)
-pneu_exibicao['local'] = novo_local
-pneu['local'] = novo_local  # <- adiciona essa linha
+                                pneu['local'] = novo_local  # <- adiciona essa linha
                                 # ----------------------------------------
                                 st.write(f"**KM POS:** {pneu_exibicao.get('km_pos', '')}")
                                 st.write(f"**KM TOTAL:** {pneu_exibicao.get('km_total', '')}")
