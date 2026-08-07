@@ -1,3 +1,17 @@
+import msal
+import requests
+import streamlit as st
+
+def obter_token():
+    """Autentica no Azure AD e retorna o Token de Acesso"""
+    app = msal.ConfidentialClientApplication(
+        st.secrets["AZURE_CLIENT_ID"],
+        authority=f"https://login.microsoftonline.com/{st.secrets['AZURE_TENANT_ID']}",
+        client_credential=st.secrets["AZURE_CLIENT_SECRET"]
+    )
+    token_response = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+    return token_response.get("access_token")
+
 def salvar_no_onedrive(dados_ia):
     """
     Envia os dados mapeados na ordem exata das 27 colunas para a tabela do OneDrive,
@@ -15,7 +29,7 @@ def salvar_no_onedrive(dados_ia):
     # ID do arquivo extraído do OneDrive
     file_id = "710AD0E3-83C9-473B-9A9B-255724AAA15C"
     
-    # URL da API Graph corrigida com /users/
+    # URL da API Graph corrigida para a tabela 'TabelaPneus'
     url = f"https://graph.microsoft.com/v1.0/users/controle.pneus@outlook.com.br/drive/items/{file_id}/workbook/tables/TabelaPneus/rows"
     
     # Mapeamento rigoroso na ordem exata das 27 colunas
