@@ -30,7 +30,7 @@ def salvar_no_onedrive(dados_ia):
     file_id = "710AD0E3-83C9-473B-9A9B-255724AAA15C"
     
     # URL da API Graph para a tabela 'TabelaPneus'
-    url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/workbook/tables/TabelaPneus/rows"
+    url = f"https://graph.microsoft.com/v1.0/controle.pneus@outlook.com.br/drive/items/{file_id}/workbook/tables/TabelaPneus/rows"
     
     # Mapeamento rigoroso na ordem exata das 27 colunas
     linha_para_excel = [
