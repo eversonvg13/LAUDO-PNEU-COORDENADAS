@@ -609,15 +609,29 @@ if st.session_state.get("inspection_results"):
                     file_name=f"laudo_bruto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf",
                 )
-# Salvar na Planilha de Laudos:
-
-if st.button("Salvar Laudo na Planilha"):
-    # O caminho do arquivo (use o 'r' antes da string para evitar erros de barra)
-    caminho_completo = r"C:\Users\SEU_USUARIO\OneDrive\Pasta\sua_planilha.xlsx"
-    
-    sucesso, mensagem = salvar_no_onedrive(dados_json_da_ia)
-    
-    if sucesso:
-        st.success("Laudo gravado no Excel com sucesso!")
+# ==============================================================================
+# SALVAR NA PLANILHA DE LAUDOS
+# ==============================================================================
+st.markdown("---")
+if st.button("Salvar Laudo na Planilha", use_container_width=True):
+    # Verifica se existem resultados processados na sessão
+    if "inspection_results" in st.session_state and st.session_state.inspection_results:
+        # Pega o último lote de pneus processados
+        ultimo_lote = st.session_state.inspection_results[-1]
+        pneus_para_salvar = ultimo_lote.get("Pneus", [])
+        
+        if pneus_para_salvar:
+            try:
+                # Envia os dados corretos para a função de salvamento
+                sucesso, mensagem = salvar_no_onedrive(pneus_para_salvar)
+                
+                if sucesso:
+                    st.success("✅ Laudo gravado no Excel com sucesso!")
+                else:
+                    st.error(f"❌ Erro ao salvar: {mensagem}")
+            except Exception as e:
+                st.error(f"❌ Erro inesperado ao executar a função de salvamento: {e}")
+        else:
+            st.warning("⚠️ Nenhum dado estruturado de pneu encontrado para salvar.")
     else:
-        st.error(f"Erro ao salvar: {mensagem}")
+        st.warning("⚠️ Você precisa gerar o laudo com a IA primeiro antes de salvar na planilha.")
