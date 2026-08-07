@@ -611,7 +611,7 @@ if st.session_state.get("inspection_results"):
                 )
 # Salvar na Planilha de Laudos:
 
-if st.button("Salvar Laudo no Banco"):
+if st.button("Salvar Laudo na Planilha"):
     # O caminho do arquivo (use o 'r' antes da string para evitar erros de barra)
     caminho_completo = r"C:\Users\SEU_USUARIO\OneDrive\Pasta\sua_planilha.xlsx"
     
