@@ -3,6 +3,19 @@ from datetime import datetime
 
 WEBHOOK_URL = "https://hook.us2.make.com/cbfm6m6pmbcpzuwfssj24e3427vi4fh3"
 
+COD_UNIDADE = {
+    "ANA LUCIA":     "98",
+    "JUSTINOPOLES":  "870",
+    "LAFAIETE":      "250",
+    "MARIA GORETTI": "16",
+    "NEVES":         "520",
+    "SARZEDO":       "61",
+    "UBERLANDIA":    "6",
+    "VENEZA":        "990",
+}
+
+COD_RELATOR = "16196"
+
 def limpar_km(valor):
     try:
         return float(str(valor).replace(",", ".").replace(" ", ""))
@@ -23,23 +36,26 @@ def salvar_no_onedrive(dados_ia):
         medida_completa = dados_ia.get("medida", "")
         cod_medida, medida = separar_medida(medida_completa)
 
+        local = dados_ia.get("local", "").strip().upper()
+        cod_unidade = COD_UNIDADE.get(local, "")
+
         payload = {
             "fogo":         dados_ia.get("fogo", ""),
             "cod_medida":   cod_medida,
             "medida":       medida,
             "veiculo":      dados_ia.get("veiculo", ""),
             "posicao":      dados_ia.get("pos", ""),
-            "cod_unidade":  dados_ia.get("local", ""),
+            "cod_unidade":  cod_unidade,
             "data_retirada":dados_ia.get("retirada", ""),
-            "analise":      datetime.now().strftime("%d/%m/%Y"),  # data de hoje
-            "nr_ref":       dados_ia.get("n_reformas", ""),       # qtd reformas
+            "analise":      datetime.now().strftime("%d/%m/%Y"),
+            "nr_ref":       dados_ia.get("n_reformas", ""),
             "km_posicao":   limpar_km(dados_ia.get("km_pos", "")),
             "km_total":     limpar_km(dados_ia.get("km_total", "")),
             "valor":        dados_ia.get("valor", ""),
             "retorno":      dados_ia.get("retorno", ""),
             "desconto":     dados_ia.get("desconto", ""),
             "fvu":          dados_ia.get("codigo_fvu", ""),
-            "cod_relator":  dados_ia.get("cod_relator", ""),
+            "cod_relator":  COD_RELATOR,
         }
 
         response = requests.post(WEBHOOK_URL, json=payload)
