@@ -382,7 +382,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                             "local": dados_tabela.get("LOCAL", "") if dados_tabela else "",
                             "km_pos": dados_tabela.get("KM/POS", "") if dados_tabela else "",
                             "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
-                            "n_reformas": dados_tabela.get("RE", dados_tabela.get("REFORMA", "0")) if dados_tabela else "0",
+                            "n_reformas": dados_tabela.get("RE", dados_tabela.get("REFORMA", "")) if dados_tabela else "0",
                             "marca": item.get("marca", ""),
                             "sulco": item.get("sulco", ""),
                             "codigo_fvu": codigo_fvu,
