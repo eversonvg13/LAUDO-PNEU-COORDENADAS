@@ -18,7 +18,7 @@ COD_RELATOR = "16196"
 
 def limpar_km(valor):
     try:
-        return float(str(valor).replace(",", ".").replace(" ", ""))
+        return str(valor).replace(".", ",").strip()
     except:
         return ""
 
