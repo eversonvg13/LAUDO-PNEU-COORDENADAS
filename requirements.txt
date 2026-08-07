@@ -11,3 +11,5 @@ google-generativeai
 pytesseract
 starlette==0.39.2
 openpyxl
+msal
+requests
