@@ -1,25 +1,44 @@
 import requests
+from datetime import datetime
 
 WEBHOOK_URL = "https://hook.us2.make.com/cbfm6m6pmbcpzuwfssj24e3427vi4fh3"
 
+def limpar_km(valor):
+    try:
+        return float(str(valor).replace(",", ".").replace(" ", ""))
+    except:
+        return ""
+
+def separar_medida(medida_completa):
+    try:
+        partes = str(medida_completa).split("-", 1)
+        if len(partes) == 2:
+            return partes[0].strip(), partes[1].strip()
+        return "", medida_completa
+    except:
+        return "", medida_completa
+
 def salvar_no_onedrive(dados_ia):
     try:
+        medida_completa = dados_ia.get("medida", "")
+        cod_medida, medida = separar_medida(medida_completa)
+
         payload = {
             "fogo":         dados_ia.get("fogo", ""),
-            "cod_medida":   dados_ia.get("cod_medida", ""),
-            "medida":       dados_ia.get("medida", ""),
+            "cod_medida":   cod_medida,
+            "medida":       medida,
             "veiculo":      dados_ia.get("veiculo", ""),
-            "posicao":      dados_ia.get("pos", ""),          # era "posicao", agora "pos"
-            "cod_unidade":  dados_ia.get("cod_unidade", ""),
-            "data_retirada":dados_ia.get("retirada", ""),     # era "data_retirada", agora "retirada"
-            "analise":      dados_ia.get("analise", ""),
-            "nr_ref":       dados_ia.get("nr_ref", ""),
-            "km_posicao":   dados_ia.get("km_pos", ""),       # era "km_posicao", agora "km_pos"
-            "km_total":     dados_ia.get("km_total", ""),
+            "posicao":      dados_ia.get("pos", ""),
+            "cod_unidade":  dados_ia.get("local", ""),
+            "data_retirada":dados_ia.get("retirada", ""),
+            "analise":      datetime.now().strftime("%d/%m/%Y"),  # data de hoje
+            "nr_ref":       dados_ia.get("n_reformas", ""),       # qtd reformas
+            "km_posicao":   limpar_km(dados_ia.get("km_pos", "")),
+            "km_total":     limpar_km(dados_ia.get("km_total", "")),
             "valor":        dados_ia.get("valor", ""),
             "retorno":      dados_ia.get("retorno", ""),
             "desconto":     dados_ia.get("desconto", ""),
-            "fvu":          dados_ia.get("codigo_fvu", ""),   # era "fvu", agora "codigo_fvu"
+            "fvu":          dados_ia.get("codigo_fvu", ""),
             "cod_relator":  dados_ia.get("cod_relator", ""),
         }
 
