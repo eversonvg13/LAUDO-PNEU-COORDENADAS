@@ -1,31 +1,30 @@
-# data_utils.py
-import openpyxl
-import os
+import msal
+import requests
+import streamlit as st
 
-def salvar_no_excel(caminho_arquivo, dados_ia):
-    """
-    Função modular para salvar dados no Excel mantendo as fórmulas.
-    """
-    try:
-        # Verifica se o arquivo existe
-        if not os.path.exists(caminho_arquivo):
-            return False, "Arquivo não encontrado."
+def obter_token():
+    # O Streamlit busca automaticamente os dados que salvamos nos Secrets
+    app = msal.ConfidentialClientApplication(
+        st.secrets["AZURE_CLIENT_ID"],
+        authority=f"https://login.microsoftonline.com/{st.secrets['AZURE_TENANT_ID']}",
+        client_credential=st.secrets["AZURE_CLIENT_SECRET"]
+    )
+    # Solicita o token de permissão de aplicativo
+    token_response = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+    return token_response.get("access_token")
 
-        # Carrega o arquivo
-        wb = openpyxl.load_workbook(caminho_arquivo, data_only=False)
-        ws = wb['Dados'] # Nome da aba
-        
-        # Encontra a próxima linha vazia
-        proxima_linha = ws.max_row + 1
-        
-        # Preenchimento (ajuste os campos conforme o seu JSON)
-        ws.cell(row=proxima_linha, column=1).value = dados_ia.get('id_pneu')
-        ws.cell(row=proxima_linha, column=2).value = dados_ia.get('codigo_fvu')
-        ws.cell(row=proxima_linha, column=3).value = dados_ia.get('observacoes')
-        
-        # Salva o arquivo
-        wb.save(caminho_arquivo)
-        return True, "Sucesso!"
-        
-    except Exception as e:
-        return False, str(e)
+def salvar_no_onedrive(id_pneu, codigo_fvu, observacoes):
+    token = obter_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    
+    # IMPORTANTE: Você precisa do ID do arquivo (driveItem ID)
+    # Dica: Rode um teste simples para listar seus arquivos se não souber o ID exato
+    file_id = "SEU_FILE_ID_AQUI" 
+    
+    # Endpoint para adicionar linha a uma tabela chamada 'TabelaPneus'
+    url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/workbook/tables/TabelaPneus/rows"
+    
+    payload = {"values": [[id_pneu, codigo_fvu, observacoes]]}
+    
+    response = requests.post(url, headers=headers, json=payload)
+    return response.status_code == 201
