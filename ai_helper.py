@@ -1,6 +1,7 @@
 import io
 import re
 import json
+import difflib
 from PIL import Image
 
 
@@ -76,3 +77,36 @@ def extrair_json_da_resposta(texto):
         raise ValueError("Nenhum array JSON encontrado na resposta da IA.")
 
     return json.loads(texto_limpo[inicio:fim + 1])
+
+
+def encontrar_fvu_por_descricao(descricao_ia, fvu_data, limiar=0.35):
+    """
+    Usada como fallback quando o código FVU sugerido pela IA não bate
+    exatamente com nenhum código da tabela. Busca, entre os registros
+    de fvu_data, aquele cuja DESCRIÇÃO mais se aproxima textualmente
+    da descrição do dano fornecida pela IA (descricao_dano_ia).
+    Retorna o dict do item mais parecido, ou None se nada ultrapassar
+    o limiar mínimo de similaridade.
+    """
+    if not descricao_ia or not fvu_data:
+        return None
+
+    texto_ia = str(descricao_ia).strip().lower()
+    if not texto_ia:
+        return None
+
+    melhor_item = None
+    melhor_score = 0.0
+
+    for item in fvu_data:
+        desc_item = str(item.get("descricao", "")).strip().lower()
+        if not desc_item:
+            continue
+        score = difflib.SequenceMatcher(None, texto_ia, desc_item).ratio()
+        if score > melhor_score:
+            melhor_score = score
+            melhor_item = item
+
+    if melhor_item is not None and melhor_score >= limiar:
+        return melhor_item
+    return None
