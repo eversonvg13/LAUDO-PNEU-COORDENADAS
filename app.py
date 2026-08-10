@@ -382,7 +382,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                             "local": dados_tabela.get("LOCAL", "") if dados_tabela else "",
                             "km_pos": dados_tabela.get("KM/POS", "") if dados_tabela else "",
                             "km_total": dados_tabela.get("KM TOTAL", "") if dados_tabela else "",
-                            "n_reformas": dados_tabela.get("RE", dados_tabela.get("REFORMA", "")) if dados_tabela else "0",
+                            "n_reformas": n_reformas, 
                             "marca": item.get("marca", ""),
                             "sulco": item.get("sulco", ""),
                             "codigo_fvu": codigo_fvu,
@@ -395,9 +395,13 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                             "imagens_bytes": imagens_bytes_pneu,
                         }
                         pneus_estruturados.append(pneu)
-                except Exception as e:
-                    erro_parse = str(e)
-                        
+                         except Exception as e:
+                            erro_parse = str(e)
+
+                            if erro_parse:
+                            st.error(f"Erro parse: {erro_parse}")  # remove depois
+
+                
                 st.session_state.inspection_results = [{
                     "Timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "Modelo_Usado": nome_modelo_ativo,
