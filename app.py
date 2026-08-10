@@ -395,7 +395,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                             "imagens_bytes": imagens_bytes_pneu,
                         }
                         pneus_estruturados.append(pneu)
-                         except Exception as e:
+                        except Exception as e:
                             erro_parse = str(e)
 
                             if erro_parse:
