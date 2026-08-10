@@ -264,12 +264,14 @@ ESTRUTURA DE REGRA TÉCNICA E GLOSSÁRIO MICHELIN:
 {guia_tecnico_fvu}
 
 TAREFAS PARA CADA PNEU IDENTIFICADO NAS FOTOS:
-1. Identifique o número de Fogo escrito a giz no pneu.
+1. Identifique o número de Fogo no pneu.
 2. Liste em "arquivos_fotos" a lista EXATA de nomes dos arquivos que mostram este mesmo pneu.
 3. Identifique a marca e estado geral do pneu.
 4. Descreva detalhadamente o dano visual encontrado (localização, profundidade, aparência das bordas, presença de arames/cintas).
 5. Siga rigorosamente a ÁRVORE DE DECISÃO para definir o "codigo_fvu_sugerido".
-   Se o pneu não apresentar avarias ou desgaste severo fora do padrão, responda "OK".
+6.Tente identificar o código FVU escrito a giz ou tinta no pneu (ex: 70K, 70R, 48D).
+   Se não conseguir identificar com clareza, use "75A" como padrão.
+   O usuário poderá corrigir manualmente depois.
 
 FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
 [
@@ -279,7 +281,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
     "sulco": "string",
     "arquivos_fotos": ["foto1.jpg"],
     "descricao_dano_ia": "string com descrição técnica rica",
-    "codigo_fvu_sugerido": "ex: 48D ou OK",
+    "codigo_fvu_sugerido": "ex: 48D",
     "confianca": "Alta | Média | Baixa"
   }}
 ]
@@ -341,7 +343,9 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
                         
                         desc_ia = item.get("descricao_dano_ia", "")
-                        codigo_ia = str(item.get("codigo_fvu_sugerido", "")).strip().upper()
+                        codigo_ia = str(item.get("codigo_fvu_sugerido", "75A")).strip().upper()
+if not codigo_ia:
+    codigo_ia = "75A"
                         fvu_direto = next((x for x in fvu_data if x["codigo"].strip().upper() == codigo_ia), None)
                         fvu_selecionado = fvu_direto if fvu_direto else encontrar_fvu_por_descricao(desc_ia, fvu_data)
                         
