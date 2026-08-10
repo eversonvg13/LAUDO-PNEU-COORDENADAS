@@ -557,13 +557,19 @@ if st.session_state.get("inspection_results"):
                                 novo_codigo = selected_fvu_label.split(" - ")[0]
                                 novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
                                 
-                                if novo_fvu_obj:
+                               if novo_fvu_obj:
                                     pneu_exibicao["codigo_fvu"] = novo_fvu_obj['codigo']
                                     pneu_exibicao["danos"] = novo_fvu_obj['descricao']
                                     pneu_exibicao["causas_provaveis"] = novo_fvu_obj['causa']
                                     pneu_exibicao["observacoes"] = novo_fvu_obj['acao']
                                     pneu_exibicao["acao_recomendada"] = novo_fvu_obj['acao']
-
+                                    # <- sincroniza com o objeto original
+                                    pneu["codigo_fvu"] = novo_fvu_obj['codigo']
+                                    pneu["danos"] = novo_fvu_obj['descricao']
+                                    pneu["causas_provaveis"] = novo_fvu_obj['causa']
+                                    pneu["observacoes"] = novo_fvu_obj['acao']
+                                    pneu["acao_recomendada"] = novo_fvu_obj['acao']
+                                   
                             c1, c2 = st.columns(2)
                             with c1:
                                 st.write(f"**POS:** {pneu_exibicao.get('pos', '')}")
