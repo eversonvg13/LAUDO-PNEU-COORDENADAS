@@ -603,7 +603,7 @@ if st.session_state.get("inspection_results"):
                             st.download_button(
                                 label=f"📄 Baixar PDF - Pneu {fogo_atual_usuario}",
                                 data=pdf_pneu_bytes,
-                                file_name=f"laudo_pneu_{fogo_atual_usuario}.pdf",
+                                file_name=f"laudo_pneu_{fogo_atual_usuario}_{veiculo_atual_usuario}.pdf",
                                 mime="application/pdf",
                                 key=f"btn_pdf_pneu_{fogo_atual_usuario}_{i}_{res['Timestamp']}"
                             )
