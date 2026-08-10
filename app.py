@@ -556,8 +556,7 @@ if st.session_state.get("inspection_results"):
                                 
                                 novo_codigo = selected_fvu_label.split(" - ")[0]
                                 novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
-                                
-                               if novo_fvu_obj:
+                            if novo_fvu_obj:
                                     pneu_exibicao["codigo_fvu"] = novo_fvu_obj['codigo']
                                     pneu_exibicao["danos"] = novo_fvu_obj['descricao']
                                     pneu_exibicao["causas_provaveis"] = novo_fvu_obj['causa']
