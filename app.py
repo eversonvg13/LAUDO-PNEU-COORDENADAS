@@ -599,7 +599,7 @@ if st.session_state.get("inspection_results"):
                             # Logo antes de chamar a função do PDF, adicione esta linha:
                             pneu_exibicao['imagens_objetos'] = imagens_do_pneu
                             pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
-                            veiculo_pdf = pneu_exibicao.get('veiculo', '').strip()
+                            veiculo_pdf = str(pneu_exibicao.get('veiculo', '')).strip().lstrip('0')
                             local_pdf = pneu_exibicao.get('local', '').strip().replace('/', '-').replace(' ', '_')
                             nome_pdf = f"laudo_{fogo_atual_usuario}"
                             if veiculo_pdf:
