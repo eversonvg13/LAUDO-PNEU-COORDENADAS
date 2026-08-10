@@ -344,8 +344,8 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                         
                         desc_ia = item.get("descricao_dano_ia", "")
                         codigo_ia = str(item.get("codigo_fvu_sugerido", "75A")).strip().upper()
-if not codigo_ia:
-    codigo_ia = "75A"
+                        if not codigo_ia:
+                            codigo_ia = "75A"
                         fvu_direto = next((x for x in fvu_data if x["codigo"].strip().upper() == codigo_ia), None)
                         fvu_selecionado = fvu_direto if fvu_direto else encontrar_fvu_por_descricao(desc_ia, fvu_data)
                         
