@@ -615,6 +615,7 @@ st.download_button(
     mime="application/pdf",
     key=f"btn_pdf_pneu_{fogo_atual_usuario}_{i}_{res['Timestamp']}"
 )
+)
             else:
                 st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
                 st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
