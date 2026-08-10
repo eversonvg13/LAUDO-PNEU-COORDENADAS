@@ -640,7 +640,6 @@ if st.button("Salvar Laudo na Planilha", use_container_width=True):
             
             # Percorre cada pneu individualmente da lista e salva na planilha
             for pneu in pneus_para_salvar:
-                st.write(f"DEBUG local: '{pneu.get('local', 'NÃO ENCONTRADO')}'")
                 try:
                     sucesso, mensagem = salvar_no_onedrive(pneu)
                     if sucesso:
