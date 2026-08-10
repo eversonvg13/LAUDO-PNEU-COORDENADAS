@@ -394,7 +394,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                             "fogo_localizado_na_planilha": dados_tabela is not None,
                             "imagens_bytes": imagens_bytes_pneu,
                         }
-                            pneus_estruturados.append(pneu)
+pneus_estruturados.append(pneu)
 
                 except Exception as e:
                     erro_parse = str(e)
