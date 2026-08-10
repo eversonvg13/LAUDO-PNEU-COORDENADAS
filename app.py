@@ -303,40 +303,56 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
 
                 # ==============================================================
                 # SISTEMA DE ROTAÇÃO AUTOMÁTICA DE CHAVES E RETRY
+                # O limite 429 do Gemini é por MINUTO, não por dia.
+                # Estratégia: tenta todas as chaves em sequência; se todas
+                # falharem, aguarda 65s e repete o ciclo (até MAX_CICLOS vezes).
                 # ==============================================================
                 lista_chaves = st.session_state.lista_chaves
                 total_chaves = len(lista_chaves)
-                tentativa_chave = 0
                 sucesso = False
                 resposta_ia = None
                 nome_modelo_ativo = ""
+                MAX_CICLOS = 3  # quantas vezes percorre todas as chaves antes de desistir
 
-                while tentativa_chave < total_chaves and not sucesso:
-                    try:
-                        chave_atual = lista_chaves[st.session_state.indice_chave_atual]
-                        genai.configure(api_key=chave_atual)
-                        
-                        nome_modelo_ativo = obter_modelo_estavel(genai)
-                        model = genai.GenerativeModel(nome_modelo_ativo)
-                        
-                        texto_status.info(f"Processando com modelo {nome_modelo_ativo} [Chave {st.session_state.indice_chave_atual + 1}/{total_chaves}]...")
-                        resposta_ia = model.generate_content(conteudo_requisicao)
-                        sucesso = True
-                        
-                    except Exception as e:
-                        erro_str = str(e)
-                        if "429" in erro_str or "ResourceExhausted" in type(e).__name__ or "quota" in erro_str.lower():
-                            tentativa_chave += 1
-                            if tentativa_chave < total_chaves:
-                                st.session_state.indice_chave_atual = (st.session_state.indice_chave_atual + 1) % total_chaves
-                                texto_status.warning(f"⚠️ Cota esgotada na chave atual (Erro 429). Alternando automaticamente para a próxima chave ({tentativa_chave}/{total_chaves})...")
+                for ciclo in range(MAX_CICLOS):
+                    falhas_no_ciclo = 0
+
+                    for tentativa in range(total_chaves):
+                        idx = (st.session_state.indice_chave_atual + tentativa) % total_chaves
+                        chave_atual = lista_chaves[idx]
+                        try:
+                            genai.configure(api_key=chave_atual)
+                            nome_modelo_ativo = obter_modelo_estavel(genai)
+                            model = genai.GenerativeModel(nome_modelo_ativo)
+                            texto_status.info(f"Processando com modelo {nome_modelo_ativo} [Chave {idx + 1}/{total_chaves} | Ciclo {ciclo + 1}/{MAX_CICLOS}]...")
+                            resposta_ia = model.generate_content(conteudo_requisicao)
+                            # Sucesso — avança o índice para a próxima chave na próxima chamada
+                            st.session_state.indice_chave_atual = (idx + 1) % total_chaves
+                            sucesso = True
+                            break
+                        except Exception as e:
+                            erro_str = str(e)
+                            is_quota = "429" in erro_str or "ResourceExhausted" in type(e).__name__ or "quota" in erro_str.lower()
+                            if is_quota:
+                                falhas_no_ciclo += 1
+                                texto_status.warning(f"⚠️ Cota esgotada na chave {idx + 1}. Tentando próxima...")
                                 time.sleep(2)
                             else:
-                                texto_status.warning(f"⚠️ Todas as chaves atingiram o limite de cota. Aguardando 15s para nova tentativa...")
-                                time.sleep(15)
-                                raise RuntimeError(f"Limite de cota excedido em todas as chaves disponíveis. Detalhes: {e}")
-                        else:
-                            raise e
+                                raise e  # erro diferente de cota — para imediatamente
+
+                    if sucesso:
+                        break
+
+                    if ciclo < MAX_CICLOS - 1:
+                        espera = 65
+                        texto_status.warning(f"⚠️ Todas as {total_chaves} chaves atingiram o limite por minuto. Aguardando {espera}s para recarregar cotas... (Ciclo {ciclo + 1}/{MAX_CICLOS})")
+                        time.sleep(espera)
+
+                if not sucesso:
+                    raise RuntimeError(
+                        f"Limite de cota excedido em todas as {total_chaves} chaves após {MAX_CICLOS} ciclos. "
+                        "Aguarde alguns minutos e tente novamente."
+                    )
 
                 pneus_estruturados = None
                 erro_parse = None
