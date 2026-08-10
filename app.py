@@ -473,7 +473,6 @@ if st.session_state.get("inspection_results"):
                         with col_tit1:
                             fogo_atual_usuario = st.text_input(
                                 f"🛞 Pneu {i} — Número de Fogo (Ajuste se necessário)",
-                                value=st.session_state[key_fogo_input],
                                 key=key_fogo_input
                             ).strip()
                         with col_tit2:
@@ -552,8 +551,10 @@ if st.session_state.get("inspection_results"):
                                         # Rotaciona no sentido anti-horário no PIL para equivaler ao horário visual
                                         img_pil = img_pil.rotate(-angulo_atual, expand=True)
 
-                                    # Exibe a imagem rotacionada na largura compacta
-                                    st.image(img_pil, caption=f"{img_f.name} ({angulo_atual}°)", width=220)
+                                    # Reduz resolução só para exibição (não afeta o PDF)
+                                    img_exibicao = img_pil.copy()
+                                    img_exibicao.thumbnail((800, 800))
+                                    st.image(img_exibicao, caption=f"{img_f.name} ({angulo_atual}°)", width=220)
 
                                     # Salva o ângulo no objeto do pneu para a função de PDF ler depois
                                     if "rotacoes_imagens" not in pneu_exibicao:
