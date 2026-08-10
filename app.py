@@ -372,10 +372,13 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                                 except Exception:
                                     pass
 
-                        # Extração da quantidade de reformas ("Re") do relatório
+                        # Extração da quantidade de reformas ("REFORMA") do relatório
+                        # Obs: a coluna gerada pelo parser.py se chama exatamente "REFORMA"
+                        # (ver CAMPOS_FIXOS em parser.py). Usar outra chave aqui faz o valor
+                        # real sempre cair no fallback "0".
                         n_reformas = "0"
                         if dados_tabela is not None:
-                            n_reformas = str(dados_tabela.get("Re", dados_tabela.get("REFORMA", dados_tabela.get("RE", "0")))).strip()
+                            n_reformas = str(dados_tabela.get("REFORMA", "0")).strip()
 
                         pneu = {
                             "fogo": fogo_lido,
@@ -442,7 +445,16 @@ if st.session_state.get("inspection_results"):
                 lista_imagens_lote = res["Imagens"]
                 total_pneus = len(res["Pneus"])
                 
+                # Conjunto de índices excluídos pelo usuário (persiste no session_state)
+                key_excluidos = f"pneus_excluidos_{res['Timestamp']}"
+                if key_excluidos not in st.session_state:
+                    st.session_state[key_excluidos] = set()
+
                 for i, pneu in enumerate(res["Pneus"], start=1):
+                    # Pula pneus que o usuário excluiu
+                    if i in st.session_state[key_excluidos]:
+                        continue
+
                     key_fogo_input = f"input_fogo_corrigido_{i}_{res['Timestamp']}"
                     
                     if key_fogo_input not in st.session_state:
@@ -450,7 +462,7 @@ if st.session_state.get("inspection_results"):
 
                     with st.container(border=True):
                         # Cabeçalho com input para corrigir o número de fogo caso a IA tenha falhado
-                        col_tit1, col_tit2 = st.columns([2, 1])
+                        col_tit1, col_tit2, col_excluir = st.columns([2, 1, 0.4])
                         with col_tit1:
                             fogo_atual_usuario = st.text_input(
                                 f"🛞 Pneu {i} — Número de Fogo (Ajuste se necessário)",
@@ -465,6 +477,11 @@ if st.session_state.get("inspection_results"):
                                 st.markdown("<p style='color: #22c55e; margin-top: 30px; font-weight: bold;'>✅ Localizado na Planilha</p>", unsafe_allow_html=True)
                             else:
                                 st.markdown("<p style='color: #eab308; margin-top: 30px; font-weight: bold;'>⚠️ Não encontrado na planilha</p>", unsafe_allow_html=True)
+                        with col_excluir:
+                            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                            if st.button("🗑️", key=f"btn_excluir_{i}_{res['Timestamp']}", help=f"Excluir pneu {fogo_atual_usuario} do processamento"):
+                                st.session_state[key_excluidos].add(i)
+                                st.rerun()
 
                         pneu_exibicao = pneu.copy()
                         pneu_exibicao['fogo'] = fogo_atual_usuario
@@ -477,7 +494,7 @@ if st.session_state.get("inspection_results"):
                             pneu_exibicao["local"] = dados_tabela_atualizados.get("LOCAL", "")
                             pneu_exibicao["km_pos"] = dados_tabela_atualizados.get("KM/POS", "")
                             pneu_exibicao["km_total"] = dados_tabela_atualizados.get("KM TOTAL", "")
-                            pneu_exibicao["n_reformas"] = str(dados_tabela_atualizados.get("Re", dados_tabela_atualizados.get("REFORMA", dados_tabela_atualizados.get("RE", "0")))).strip()
+                            pneu_exibicao["n_reformas"] = str(dados_tabela_atualizados.get("REFORMA", "0")).strip()
                             pneu_exibicao["fogo_localizado_na_planilha"] = True
                         else:
                             pneu_exibicao["fogo_localizado_na_planilha"] = False
@@ -618,6 +635,22 @@ if st.session_state.get("inspection_results"):
                                 mime="application/pdf",
                                 key=f"btn_pdf_pneu_{fogo_atual_usuario}_{i}_{res['Timestamp']}"
                             )
+                # Painel de restauração — aparece só se houver pneus excluídos
+                excluidos = st.session_state.get(key_excluidos, set())
+                if excluidos:
+                    st.markdown("---")
+                    st.markdown(f"**🗑️ Pneus excluídos deste lote: {len(excluidos)}**")
+                    for idx_exc in sorted(excluidos):
+                        pneu_exc = res["Pneus"][idx_exc - 1]
+                        fogo_exc = pneu_exc.get("fogo", f"#{idx_exc}")
+                        col_info, col_rest = st.columns([3, 1])
+                        with col_info:
+                            st.caption(f"Pneu {idx_exc} — Fogo {fogo_exc}")
+                        with col_rest:
+                            if st.button("↩️ Restaurar", key=f"btn_restaurar_{idx_exc}_{res['Timestamp']}"):
+                                st.session_state[key_excluidos].discard(idx_exc)
+                                st.rerun()
+
             else:
                 st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
                 st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
@@ -636,13 +669,20 @@ st.markdown("---")
 if st.button("Salvar Laudo na Planilha", use_container_width=True):
     if "inspection_results" in st.session_state and st.session_state.inspection_results:
         ultimo_lote = st.session_state.inspection_results[-1]
-        pneus_para_salvar = ultimo_lote.get("Pneus", [])
-        
+        pneus_todos = ultimo_lote.get("Pneus", [])
+
+        # Remove pneus excluídos pelo usuário antes de salvar
+        key_excluidos_salvar = f"pneus_excluidos_{ultimo_lote['Timestamp']}"
+        excluidos_salvar = st.session_state.get(key_excluidos_salvar, set())
+        pneus_para_salvar = [
+            p for idx, p in enumerate(pneus_todos, start=1)
+            if idx not in excluidos_salvar
+        ]
+
         if pneus_para_salvar:
             sucessos = 0
             erros = []
 
-            
             # Percorre cada pneu individualmente da lista e salva na planilha
             for pneu in pneus_para_salvar:
                 try:
