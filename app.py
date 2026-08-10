@@ -81,8 +81,17 @@ if "lista_chaves" not in st.session_state:
     st.session_state.indice_chave_atual = 0
 
 @st.cache_data(show_spinner=False)
-def gerar_pdf_em_cache(pneu_dict, data_str):
-    return gerar_pdf_laudo_pneu(pneu_dict, data_str)
+def gerar_pdf_em_cache(pneu_dict_sem_imagens, data_str, cache_key_imagens, _imagens_objetos):
+    """
+    O parâmetro _imagens_objetos (prefixo '_') é ignorado pelo hasher do
+    Streamlit — evita re-hashear bytes de imagem a cada rerun, o que é caro
+    e pode fazer o cache nunca "bater". Quem controla se o PDF precisa ser
+    regerado é o cache_key_imagens (nomes + ângulo de rotação de cada foto),
+    que é leve e estável.
+    """
+    pneu_completo = dict(pneu_dict_sem_imagens)
+    pneu_completo["imagens_objetos"] = _imagens_objetos
+    return gerar_pdf_laudo_pneu(pneu_completo, data_str)
 
 def get_image_base64(path):
     if os.path.exists(path):
@@ -617,7 +626,17 @@ if st.session_state.get("inspection_results"):
 
                             # Logo antes de chamar a função do PDF, adicione esta linha:
                             pneu_exibicao['imagens_objetos'] = imagens_do_pneu
-                            pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
+                            pneu_sem_imagens = {k: v for k, v in pneu_exibicao.items() if k != 'imagens_objetos'}
+                            cache_key_imagens = tuple(
+                                (img.name, pneu_exibicao.get("rotacoes_imagens", {}).get(img.name, 0))
+                                for img in imagens_do_pneu
+                            )
+                            pdf_pneu_bytes = gerar_pdf_em_cache(
+                                pneu_sem_imagens,
+                                res["Timestamp"].split()[0],
+                                cache_key_imagens,
+                                imagens_do_pneu,
+                            )
                             veiculo_pdf = str(pneu_exibicao.get('veiculo', '')).strip().lstrip('0')
                             local_pdf = pneu_exibicao.get('local', '').strip().replace('/', '-').replace(' ', '_')
                             nome_pdf = f"laudo_{fogo_atual_usuario}"
