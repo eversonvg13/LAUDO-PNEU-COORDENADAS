@@ -48,7 +48,11 @@ def parse_relatorio_html(file_bytes):
                 texto = div.get_text()
                 linhas.setdefault(top, []).append((left, texto))
 
-            for top, campos in linhas.items():
+            # O RDprint omite o VEICULO quando ele repete na linha seguinte.
+            # Propagamos o último veículo válido encontrado na página.
+            veiculo_atual = ""
+
+            for top, campos in sorted(linhas.items()):
                 if len(campos) < 10:
                     continue
                 campos.sort(key=lambda c: c[0])
@@ -58,16 +62,22 @@ def parse_relatorio_html(file_bytes):
                     if coluna and coluna not in registro:
                         registro[coluna] = texto.strip()
 
-                veiculo = registro.get("VEICULO", "")
+                # Atualiza o veículo propagado se esta linha tiver um
+                veiculo_linha = registro.get("VEICULO", "")
+                if veiculo_linha.isdigit():
+                    veiculo_atual = veiculo_linha
+
                 fogo = registro.get("FOGO", "")
-                if veiculo.isdigit() and fogo.isdigit():
+
+                # Aceita a linha se tiver fogo válido e houver veículo propagado
+                if fogo.isdigit() and veiculo_atual:
                     # Mapeia com segurança a quantidade de reforma (prioriza RE, RECAP1, ou VIDA1 se houver)
                     reforma_val = registro.get("RE", "").strip() or "0"
-                    
+
                     reg_dict = {
                         "FOGO": fogo,
                         "POS": registro.get("POS", ""),
-                        "VEICULO": veiculo,
+                        "VEICULO": veiculo_atual,
                         "MEDIDA": registro.get("MEDIDA", ""),
                         "RETIRADA": registro.get("RETIRADA", ""),
                         "LOCAL": registro.get("LOCAL", ""),
