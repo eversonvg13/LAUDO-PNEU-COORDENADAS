@@ -375,7 +375,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                         # Extração da quantidade de reformas ("Re") do relatório
                         n_reformas = "0"
                         if dados_tabela is not None:
-                            n_reformas = str(dados_tabela.get("Re", dados_tabela.get("REFORMAS", dados_tabela.get("RE", "0")))).strip()
+                            n_reformas = str(dados_tabela.get("Re", dados_tabela.get("REFORMA", dados_tabela.get("RE", "0")))).strip()
 
                         pneu = {
                             "fogo": fogo_lido,
@@ -477,7 +477,7 @@ if st.session_state.get("inspection_results"):
                             pneu_exibicao["local"] = dados_tabela_atualizados.get("LOCAL", "")
                             pneu_exibicao["km_pos"] = dados_tabela_atualizados.get("KM/POS", "")
                             pneu_exibicao["km_total"] = dados_tabela_atualizados.get("KM TOTAL", "")
-                            pneu_exibicao["n_reformas"] = str(dados_tabela_atualizados.get("Re", dados_tabela_atualizados.get("REFORMAS", dados_tabela_atualizados.get("RE", "0")))).strip()
+                            pneu_exibicao["n_reformas"] = str(dados_tabela_atualizados.get("Re", dados_tabela_atualizados.get("REFORMA", dados_tabela_atualizados.get("RE", "0")))).strip()
                             pneu_exibicao["fogo_localizado_na_planilha"] = True
                         else:
                             pneu_exibicao["fogo_localizado_na_planilha"] = False
