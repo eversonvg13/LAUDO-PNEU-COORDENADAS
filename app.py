@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 import google.generativeai as genai
-import streamlit as st
 from data_utils import salvar_no_onedrive
 
 # Importações dos módulos locais
@@ -16,6 +15,7 @@ from ai_helper import (
     obter_modelo_estavel,
     buscar_dados_relatorio,
     extrair_json_da_resposta,
+    encontrar_fvu_por_descricao,
 )
 from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
 
@@ -43,8 +43,6 @@ def carregar_tabela_fvu():
     except Exception as e:
         st.error(f"⚠️ Erro ao carregar a planilha: {e}")
         return []
-
-
 
 #lista de unidade
 unidades_disponiveis = [
@@ -245,8 +243,8 @@ with st.container(border=True):
                 texto_status = st.empty()
                 texto_status.info("Inspecionando imagens com alta precisão visual...")
 
-                fvu_data = carregar_tabela_fvu()
-                
+                fvu_data = st.session_state.fvu_data
+
                 # Prepara o conteúdo da requisição
                 dict_fotos_enviadas = {f.name: f for f in uploaded_files}
                 sorted_files = sorted(uploaded_files, key=lambda f: f.name)
@@ -540,8 +538,7 @@ if st.session_state.get("inspection_results"):
                                     angulo_atual = st.session_state[key_rot]
 
                                     # Abre a imagem com PIL (Pillow) para aplicar a rotação e exibir/salvar
-                                    from PIL import Image as PILImage
-                                    img_pil = PILImage.open(img_f)
+                                    img_pil = Image.open(img_f)
                                     if angulo_atual > 0:
                                         # Rotaciona no sentido anti-horário no PIL para equivaler ao horário visual
                                         img_pil = img_pil.rotate(-angulo_atual, expand=True)
@@ -573,7 +570,7 @@ if st.session_state.get("inspection_results"):
                                 
                                 novo_codigo = selected_fvu_label.split(" - ")[0]
                                 novo_fvu_obj = next((x for x in fvu_options if x['codigo'].lower() == novo_codigo.lower()), None)
-                            if novo_fvu_obj:
+                                if novo_fvu_obj:
                                     pneu_exibicao["codigo_fvu"] = novo_fvu_obj['codigo']
                                     pneu_exibicao["danos"] = novo_fvu_obj['descricao']
                                     pneu_exibicao["causas_provaveis"] = novo_fvu_obj['causa']
@@ -585,7 +582,7 @@ if st.session_state.get("inspection_results"):
                                     pneu["causas_provaveis"] = novo_fvu_obj['causa']
                                     pneu["observacoes"] = novo_fvu_obj['acao']
                                     pneu["acao_recomendada"] = novo_fvu_obj['acao']
-                                   
+
                             c1, c2 = st.columns(2)
                             with c1:
                                 st.write(f"**POS:** {pneu_exibicao.get('pos', '')}")
