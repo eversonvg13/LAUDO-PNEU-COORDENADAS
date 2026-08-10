@@ -12,7 +12,7 @@ from reportlab.platypus import (
     Image as RLImage
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 def gerar_pdf_laudo_pneu(pneu, data_analise):
     buffer = io.BytesIO()
@@ -121,14 +121,11 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         Paragraph("Laudo de Pneus", style_header_sub)
     ]
     
-    if logo_path:
-        header_table_data = [
-            [img_logo, bloco_titulo_central, Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
-        ]
-    else:
-        header_table_data = [
-            [Paragraph("<b>COORDENADAS</b>", style_header_title), bloco_titulo_central, Paragraph("<b>SGQ 391/15-Rev01</b>", ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT))]
-        ]
+    style_sgq = ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_RIGHT)
+    coluna_esquerda = img_logo if logo_path else Paragraph("<b>COORDENADAS</b>", style_header_title)
+    header_table_data = [
+        [coluna_esquerda, bloco_titulo_central, Paragraph("<b>SGQ 391/15-Rev01</b>", style_sgq)]
+    ]
         
     t_header = Table(header_table_data, colWidths=[120, 325, 115])
     t_header.setStyle(TableStyle([
