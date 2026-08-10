@@ -601,7 +601,7 @@ if st.session_state.get("inspection_results"):
 
                             pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
                             st.download_button(
-                                veiculo_pdf = pneu_exibicao.get('veiculo', '').strip()
+                               veiculo_pdf = pneu_exibicao.get('veiculo', '').strip()
 local_pdf = pneu_exibicao.get('local', '').strip().replace('/', '-').replace(' ', '_')
 nome_pdf = f"laudo_{fogo_atual_usuario}"
 if veiculo_pdf:
