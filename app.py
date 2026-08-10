@@ -598,24 +598,21 @@ if st.session_state.get("inspection_results"):
 
                             # Logo antes de chamar a função do PDF, adicione esta linha:
                             pneu_exibicao['imagens_objetos'] = imagens_do_pneu
-
                             pdf_pneu_bytes = gerar_pdf_em_cache(pneu_exibicao, res["Timestamp"].split()[0])
+                            veiculo_pdf = pneu_exibicao.get('veiculo', '').strip()
+                            local_pdf = pneu_exibicao.get('local', '').strip().replace('/', '-').replace(' ', '_')
+                            nome_pdf = f"laudo_{fogo_atual_usuario}"
+                            if veiculo_pdf:
+                                nome_pdf += f"_vei{veiculo_pdf}"
+                            if local_pdf:
+                                nome_pdf += f"_{local_pdf}"
                             st.download_button(
-                               veiculo_pdf = pneu_exibicao.get('veiculo', '').strip()
-local_pdf = pneu_exibicao.get('local', '').strip().replace('/', '-').replace(' ', '_')
-nome_pdf = f"laudo_{fogo_atual_usuario}"
-if veiculo_pdf:
-    nome_pdf += f"_vei{veiculo_pdf}"
-if local_pdf:
-    nome_pdf += f"_{local_pdf}"
-st.download_button(
-    label=f"📄 Baixar PDF - Pneu {fogo_atual_usuario}",
-    data=pdf_pneu_bytes,
-    file_name=f"{nome_pdf}.pdf",
-    mime="application/pdf",
-    key=f"btn_pdf_pneu_{fogo_atual_usuario}_{i}_{res['Timestamp']}"
-)
-)
+                                label=f"📄 Baixar PDF - Pneu {fogo_atual_usuario}",
+                                data=pdf_pneu_bytes,
+                                file_name=f"{nome_pdf}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_pdf_pneu_{fogo_atual_usuario}_{i}_{res['Timestamp']}"
+                            )
             else:
                 st.warning("⚠️ Não foi possível estruturar o JSON da IA. Baixe o relatório em texto abaixo.")
                 st.text_area("Resposta bruta da IA", res["Analise_IA_Bruta"], height=200)
