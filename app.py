@@ -394,13 +394,14 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                             "fogo_localizado_na_planilha": dados_tabela is not None,
                             "imagens_bytes": imagens_bytes_pneu,
                         }
-                        pneus_estruturados.append(pneu)
-                        except Exception as e:
-    erro_parse = str(e)
+                            pneus_estruturados.append(pneu)
 
-if erro_parse:
-    st.error(f"Erro parse: {erro_parse}")  # remove depois
-                
+                except Exception as e:
+                    erro_parse = str(e)
+
+                if erro_parse:
+                    st.error(f"Erro parse: {erro_parse}")
+                        
                 st.session_state.inspection_results = [{
                     "Timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "Modelo_Usado": nome_modelo_ativo,
