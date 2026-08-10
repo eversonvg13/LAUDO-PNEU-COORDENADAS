@@ -603,7 +603,7 @@ if st.session_state.get("inspection_results"):
                             local_pdf = pneu_exibicao.get('local', '').strip().replace('/', '-').replace(' ', '_')
                             nome_pdf = f"laudo_{fogo_atual_usuario}"
                             if veiculo_pdf:
-                                nome_pdf += f"_vei{veiculo_pdf}"
+                                nome_pdf += f"_{veiculo_pdf}"
                             if local_pdf:
                                 nome_pdf += f"_{local_pdf}"
                             st.download_button(
