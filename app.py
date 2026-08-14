@@ -7,6 +7,8 @@ import streamlit as st
 from PIL import Image
 import google.generativeai as genai
 from data_utils import salvar_no_onedrive
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Importações dos módulos locais
 from parser import parse_relatorio_html, CAMPOS_FIXOS
