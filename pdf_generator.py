@@ -14,6 +14,14 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
+# Resolução máxima (em pixels) das fotos embutidas no PDF.
+# A foto é exibida no PDF como uma miniatura de 230x145pt, então não há
+# ganho visual em embutir a imagem na resolução original da câmera —
+# isso só infla o uso de memória e o tamanho do arquivo final.
+MAX_DIM_FOTO_PDF = 900
+QUALIDADE_JPEG_PDF = 70
+
+
 def gerar_pdf_laudo_pneu(pneu, data_analise):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -265,16 +273,24 @@ def gerar_pdf_laudo_pneu(pneu, data_analise):
         linha_atual = []
         for img_file in imagens_pneu_objs:
             try:
-                img_pil = PILImage.open(img_file)
-                
-                angulo = rotacoes_dict.get(img_file.name, 0)
-                if angulo > 0:
-                    img_pil = img_pil.rotate(-angulo, expand=True)
-                
-                img_io = io.BytesIO()
-                img_pil.save(img_io, format='JPEG')
-                img_io.seek(0)
-                
+                with PILImage.open(img_file) as img_pil_original:
+                    # Converte para RGB (evita erro ao salvar PNG/RGBA como JPEG)
+                    img_pil = img_pil_original.convert('RGB')
+
+                    angulo = rotacoes_dict.get(img_file.name, 0)
+                    if angulo > 0:
+                        img_pil = img_pil.rotate(-angulo, expand=True)
+
+                    # Redimensiona ANTES de embutir no PDF — a foto é exibida
+                    # como miniatura de 230x145pt, então não há motivo para
+                    # carregar/embutir a resolução original da câmera (isso é
+                    # o que estava causando o alto consumo de memória).
+                    img_pil.thumbnail((MAX_DIM_FOTO_PDF, MAX_DIM_FOTO_PDF), PILImage.Resampling.LANCZOS)
+
+                    img_io = io.BytesIO()
+                    img_pil.save(img_io, format='JPEG', quality=QUALIDADE_JPEG_PDF, optimize=True)
+                    img_io.seek(0)
+
                 rl_img = RLImage(img_io, width=230, height=145)
                 linha_atual.append(rl_img)
                 if len(linha_atual) == 2:
