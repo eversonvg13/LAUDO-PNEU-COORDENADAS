@@ -7,7 +7,7 @@ beautifulsoup4
 fpdf2
 reportlab
 httpx
-google-generativeai
+google-genai
 pytesseract
 starlette==0.39.2
 openpyxl
