@@ -573,7 +573,7 @@ if st.session_state.get("inspection_results"):
                                     try:
                                         img_exibicao = img_pil.copy()
                                         img_exibicao.thumbnail((800, 800))
-                                        st.image(img_exibicao, caption=f"{...}", width='stretch')
+                                        st.image(img_exibicao, caption=f"{img_f.name}", width='stretch')
                                     except OSError as e:
                                         st.warning(f"Não foi possível exibir esta imagem (arquivo truncado/corrompido): {e}")
                                     # Salva o ângulo no objeto do pneu para a função de PDF ler depois
