@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from PIL import Image
-from google import genai
+import google.generativeai as genai
 from data_utils import salvar_no_onedrive
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -232,7 +232,7 @@ if "dados_relatorio" not in st.session_state:
 if not st.session_state.dados_relatorio.empty:
     with st.expander(f"✅ {len(st.session_state.dados_relatorio)} pneus extraídos do relatório. Clique para ver/editar."):
         st.session_state.dados_relatorio = st.data_editor(
-            st.session_state.dados_relatorio, num_rows="dynamic", use_container_width=True, key="editor_dados_relatorio",
+            st.session_state.dados_relatorio, num_rows="dynamic", width='stretch', key="editor_dados_relatorio",
         )
 
 # ==============================================================================
@@ -241,7 +241,7 @@ if not st.session_state.dados_relatorio.empty:
 st.markdown("<br>", unsafe_allow_html=True)
 
 with st.container(border=True):
-    if st.button("📤 Gerar Laudo", type="primary", use_container_width=True):
+    if st.button("📤 Gerar Laudo", type="primary", width='stretch'):
         if not uploaded_files:
             st.warning("⚠️ Por favor, envie as fotos dos pneus antes de gerar o laudo.")
         elif not st.session_state.get("lista_chaves"):
@@ -703,7 +703,7 @@ if st.session_state.get("inspection_results"):
 # SALVAR NA PLANILHA DE LAUDOS
 # ==============================================================================
 st.markdown("---")
-if st.button("Salvar Laudo na Planilha", use_container_width=True):
+if st.button("Salvar Laudo na Planilha", width='stretch'):
     if "inspection_results" in st.session_state and st.session_state.inspection_results:
         ultimo_lote = st.session_state.inspection_results[-1]
         pneus_todos = ultimo_lote.get("Pneus", [])
