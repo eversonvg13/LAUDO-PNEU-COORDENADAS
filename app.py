@@ -569,11 +569,13 @@ if st.session_state.get("inspection_results"):
                                         # Rotaciona no sentido anti-horário no PIL para equivaler ao horário visual
                                         img_pil = img_pil.rotate(-angulo_atual, expand=True)
 
-                                    # Reduz resolução só para exibição (não afeta o PDF)
-                                    img_exibicao = img_pil.copy()
-                                    img_exibicao.thumbnail((800, 800))
-                                    st.image(img_exibicao, caption=f"{img_f.name} ({angulo_atual}°)", width=220)
-
+                                    # Reduz resolução só para exibição
+                                    try:
+                                        img_exibicao = img_pil.copy()
+                                        img_exibicao.thumbnail((800, 800))
+                                        st.image(img_exibicao, caption=f"{...}", width='stretch')
+                                    except OSError as e:
+                                        st.warning(f"Não foi possível exibir esta imagem (arquivo truncado/corrompido): {e}")
                                     # Salva o ângulo no objeto do pneu para a função de PDF ler depois
                                     if "rotacoes_imagens" not in pneu_exibicao:
                                         pneu_exibicao["rotacoes_imagens"] = {}
