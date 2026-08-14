@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from PIL import Image
-import google.generativeai as genai
+from google import genai
 from data_utils import salvar_no_onedrive
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
