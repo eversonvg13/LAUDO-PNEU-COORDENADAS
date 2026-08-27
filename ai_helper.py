@@ -193,6 +193,7 @@ def processar_lotes_em_paralelo(lotes, lista_chaves, nome_modelo, prompt_instruc
     resultados = [None] * total_lotes
     pendentes = list(range(total_lotes))
     indice_chave = {i: i % total_chaves for i in pendentes}
+    ultimo_erro_por_lote = {}
 
     max_workers = max(1, min(total_lotes, total_chaves))
 
@@ -226,6 +227,7 @@ def processar_lotes_em_paralelo(lotes, lista_chaves, nome_modelo, prompt_instruc
                     fut.cancel()
                     indice_chave[i] = (indice_chave[i] + 1) % total_chaves
                     novos_pendentes.append(i)
+                    ultimo_erro_por_lote[i] = f"processo travou/excedeu {TIMEOUT_SEGUNDOS + 30}s sem responder"
                     if callback_status:
                         callback_status(f"⚠️ Lote {i + 1} travou/expirou. Tentando de novo...")
                     continue
@@ -239,6 +241,7 @@ def processar_lotes_em_paralelo(lotes, lista_chaves, nome_modelo, prompt_instruc
                     if is_quota:
                         indice_chave[i] = (indice_chave[i] + 1) % total_chaves
                         novos_pendentes.append(i)
+                        ultimo_erro_por_lote[i] = erro_str
                         if callback_status:
                             callback_status(f"⚠️ Cota esgotada no lote {i + 1}. Tentando próxima chave...")
                     else:
@@ -253,8 +256,12 @@ def processar_lotes_em_paralelo(lotes, lista_chaves, nome_modelo, prompt_instruc
                 time.sleep(65)
 
     if pendentes:
+        detalhes = "; ".join(
+            f"lote {i + 1}: {ultimo_erro_por_lote.get(i, 'sem detalhe')}" for i in pendentes
+        )
         raise RuntimeError(
-            f"Limite de cota excedido para {len(pendentes)} lote(s) de imagens após {max_ciclos} ciclos."
+            f"Limite de cota excedido para {len(pendentes)} lote(s) de imagens após {max_ciclos} ciclos. "
+            f"Detalhes: {detalhes}"
         )
 
     return resultados
