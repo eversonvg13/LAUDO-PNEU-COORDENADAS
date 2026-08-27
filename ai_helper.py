@@ -1,7 +1,9 @@
 import io
 import re
 import json
+import time
 import difflib
+import concurrent.futures
 from PIL import Image
 
 
@@ -110,3 +112,117 @@ def encontrar_fvu_por_descricao(descricao_ia, fvu_data, limiar=0.35):
     if melhor_item is not None and melhor_score >= limiar:
         return melhor_item
     return None
+
+
+def montar_lotes(sorted_files, imagens_por_lote):
+    """
+    Divide a lista de arquivos (já ordenada) em lotes de tamanho fixo,
+    preservando a ordem. Cada lote vira UMA chamada separada à IA.
+
+    imagens_por_lote deve ser um múltiplo do nº de fotos que o usuário tira
+    por pneu (normalmente 2), para não correr o risco de separar as fotos de
+    um mesmo pneu em dois lotes diferentes.
+    """
+    imagens_por_lote = max(1, imagens_por_lote)
+    return [
+        sorted_files[i:i + imagens_por_lote]
+        for i in range(0, len(sorted_files), imagens_por_lote)
+    ]
+
+
+def _chamar_gemini_processo(api_key, nome_modelo, arquivos_batch, prompt_instrucoes):
+    """
+    Executa UMA chamada ao Gemini para um lote de imagens.
+
+    Roda dentro de um processo separado (via ProcessPoolExecutor). Isso é
+    importante porque genai.configure(api_key=...) altera um estado GLOBAL
+    do SDK — se dois lotes rodassem em paralelo dentro de THREADS do mesmo
+    processo, um poderia sobrescrever a chave do outro no meio da chamada.
+    Usando processos separados, cada um tem seu próprio estado do SDK e pode
+    usar uma chave de API diferente com segurança, de verdade em paralelo.
+
+    arquivos_batch: lista de tuplas (nome_arquivo, bytes_jpeg_ja_comprimidos)
+    Retorna o texto bruto da resposta da IA.
+    """
+    import google.generativeai as genai_proc
+
+    genai_proc.configure(api_key=api_key)
+    model = genai_proc.GenerativeModel(nome_modelo)
+
+    conteudo = []
+    for nome, dados in arquivos_batch:
+        conteudo.append(f"Arquivo: {nome}")
+        conteudo.append({"mime_type": "image/jpeg", "data": dados})
+    conteudo.append(prompt_instrucoes)
+
+    resposta = model.generate_content(conteudo)
+    return resposta.text
+
+
+def processar_lotes_em_paralelo(lotes, lista_chaves, nome_modelo, prompt_instrucoes,
+                                 max_ciclos=3, callback_status=None):
+    """
+    Dispara um lote de chamadas ao Gemini em paralelo (um processo por lote,
+    até o nº de chaves de API disponíveis) e devolve os textos brutos de
+    resposta na MESMA ordem dos lotes de entrada.
+
+    Em caso de erro de cota (429) num lote específico, só aquele lote é
+    reenviado com a próxima chave disponível — os demais lotes já concluídos
+    não são refeitos.
+
+    Lança RuntimeError se, ao final de max_ciclos, algum lote ainda não
+    tiver conseguido resposta em nenhuma chave.
+    """
+    total_chaves = len(lista_chaves)
+    total_lotes = len(lotes)
+    resultados = [None] * total_lotes
+    pendentes = list(range(total_lotes))
+    indice_chave = {i: i % total_chaves for i in pendentes}
+
+    max_workers = max(1, min(total_lotes, total_chaves))
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        for ciclo in range(max_ciclos):
+            if not pendentes:
+                break
+
+            futuros = {}
+            for i in pendentes:
+                chave = lista_chaves[indice_chave[i]]
+                fut = executor.submit(
+                    _chamar_gemini_processo, chave, nome_modelo, lotes[i], prompt_instrucoes
+                )
+                futuros[fut] = i
+
+            novos_pendentes = []
+            for fut in concurrent.futures.as_completed(futuros):
+                i = futuros[fut]
+                try:
+                    resultados[i] = fut.result()
+                    if callback_status:
+                        callback_status(f"Lote {i + 1}/{total_lotes} concluído ({len(lotes[i])} fotos).")
+                except Exception as e:
+                    erro_str = str(e)
+                    is_quota = "429" in erro_str or "ResourceExhausted" in type(e).__name__ or "quota" in erro_str.lower()
+                    if is_quota:
+                        indice_chave[i] = (indice_chave[i] + 1) % total_chaves
+                        novos_pendentes.append(i)
+                        if callback_status:
+                            callback_status(f"⚠️ Cota esgotada no lote {i + 1}. Tentando próxima chave...")
+                    else:
+                        raise RuntimeError(f"Erro no lote {i + 1}: {e}")
+
+            pendentes = novos_pendentes
+            if pendentes and ciclo < max_ciclos - 1:
+                if callback_status:
+                    callback_status(
+                        f"⚠️ Aguardando 65s para recarregar cotas ({len(pendentes)} lote(s) pendente(s))..."
+                    )
+                time.sleep(65)
+
+    if pendentes:
+        raise RuntimeError(
+            f"Limite de cota excedido para {len(pendentes)} lote(s) de imagens após {max_ciclos} ciclos."
+        )
+
+    return resultados
