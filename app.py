@@ -334,7 +334,7 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                 # os lotes/processos — evita chamar genai.list_models() (uma
                 # requisição de rede extra) a cada tentativa/lote.
                 if "modelo_gemini_ativo" not in st.session_state:
-                    genai.configure(api_key=lista_chaves[st.session_state.indice_chave_atual])
+                    genai.configure(api_key=lista_chaves[st.session_state.indice_chave_atual], transport="rest")
                     st.session_state.modelo_gemini_ativo = obter_modelo_estavel(genai)
                 nome_modelo_ativo = st.session_state.modelo_gemini_ativo
 
