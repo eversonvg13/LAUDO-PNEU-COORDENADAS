@@ -18,6 +18,8 @@ from ai_helper import (
     buscar_dados_relatorio,
     extrair_json_da_resposta,
     encontrar_fvu_por_descricao,
+    montar_lotes,
+    processar_lotes_em_paralelo,
 )
 from pdf_generator import gerar_pdf_laudo_pneu, gerar_pdf_fallback
 
@@ -225,6 +227,17 @@ with col2:
             "Modo de Análise IA:",
             ["Inspeção Completa (ID Fogo + Sulco + Danos)", "Apenas Extrair Número de 'Fogo' (ID do Pneu)", "Análise Profunda de Danos e Desgaste de Banda"]
         )
+        col_lote1, col_lote2 = st.columns(2)
+        with col_lote1:
+            fotos_por_pneu = st.number_input(
+                "Fotos por pneu", min_value=1, max_value=10, value=2, step=1,
+                help="Quantas fotos você tira de cada pneu (ex: 1 do código FOGO + 1 do dano = 2)."
+            )
+        with col_lote2:
+            pneus_por_lote = st.number_input(
+                "Pneus por chamada de IA", min_value=1, max_value=20, value=3, step=1,
+                help="Cada lote vira UMA chamada ao Gemini. Lotes menores processam em paralelo e tendem a ser mais rápidos, mas usam mais chamadas de API (uma por lote)."
+            )
 
 if "dados_relatorio" not in st.session_state:
     st.session_state.dados_relatorio = pd.DataFrame(columns=CAMPOS_FIXOS)
@@ -296,73 +309,80 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
 ]
 """
 
-                conteudo_requisicao = []
-                for f in sorted_files:
-                    bytes_comprimidos = comprimir_imagem(f.getvalue())
-                    conteudo_requisicao.append(f"Arquivo: {f.name}")
-                    conteudo_requisicao.append({"mime_type": "image/jpeg", "data": bytes_comprimidos})
-                conteudo_requisicao.append(prompt_instrucoes)
+                # Comprime todas as imagens já como (nome, bytes) — isso é
+                # rápido (CPU local) e é feito uma vez só, antes de montar os lotes.
+                imagens_comprimidas = [
+                    (f.name, comprimir_imagem(f.getvalue())) for f in sorted_files
+                ]
 
                 # ==============================================================
-                # SISTEMA DE ROTAÇÃO AUTOMÁTICA DE CHAVES E RETRY
-                # O limite 429 do Gemini é por MINUTO, não por dia.
-                # Estratégia: tenta todas as chaves em sequência; se todas
-                # falharem, aguarda 65s e repete o ciclo (até MAX_CICLOS vezes).
+                # DIVISÃO EM LOTES + CHAMADAS EM PARALELO
+                # Em vez de mandar TODAS as fotos numa única requisição gigante
+                # (o que fazia o tempo de resposta crescer com o total de fotos
+                # do lote inteiro), dividimos em lotes pequenos e disparamos as
+                # chamadas ao Gemini em paralelo — um processo por lote, cada
+                # um podendo usar uma chave de API diferente.
                 # ==============================================================
+                imagens_por_lote = int(fotos_por_pneu) * int(pneus_por_lote)
+                lotes = montar_lotes(imagens_comprimidas, imagens_por_lote)
+
                 lista_chaves = st.session_state.lista_chaves
                 total_chaves = len(lista_chaves)
-                sucesso = False
-                resposta_ia = None
-                nome_modelo_ativo = ""
                 MAX_CICLOS = 3  # quantas vezes percorre todas as chaves antes de desistir
 
-                for ciclo in range(MAX_CICLOS):
-                    falhas_no_ciclo = 0
+                # O nome do modelo é resolvido UMA vez só e reaproveitado em todos
+                # os lotes/processos — evita chamar genai.list_models() (uma
+                # requisição de rede extra) a cada tentativa/lote.
+                if "modelo_gemini_ativo" not in st.session_state:
+                    genai.configure(api_key=lista_chaves[st.session_state.indice_chave_atual])
+                    st.session_state.modelo_gemini_ativo = obter_modelo_estavel(genai)
+                nome_modelo_ativo = st.session_state.modelo_gemini_ativo
 
-                    for tentativa in range(total_chaves):
-                        idx = (st.session_state.indice_chave_atual + tentativa) % total_chaves
-                        chave_atual = lista_chaves[idx]
-                        try:
-                            genai.configure(api_key=chave_atual)
-                            nome_modelo_ativo = obter_modelo_estavel(genai)
-                            model = genai.GenerativeModel(nome_modelo_ativo)
-                            texto_status.info(f"Processando com modelo {nome_modelo_ativo} [Chave {idx + 1}/{total_chaves} | Ciclo {ciclo + 1}/{MAX_CICLOS}]...")
-                            resposta_ia = model.generate_content(conteudo_requisicao)
-                            # Sucesso — avança o índice para a próxima chave na próxima chamada
-                            st.session_state.indice_chave_atual = (idx + 1) % total_chaves
-                            sucesso = True
-                            break
-                        except Exception as e:
-                            erro_str = str(e)
-                            is_quota = "429" in erro_str or "ResourceExhausted" in type(e).__name__ or "quota" in erro_str.lower()
-                            if is_quota:
-                                falhas_no_ciclo += 1
-                                texto_status.warning(f"⚠️ Cota esgotada na chave {idx + 1}. Tentando próxima...")
-                                time.sleep(2)
-                            else:
-                                raise e  # erro diferente de cota — para imediatamente
+                texto_status.info(
+                    f"Processando {len(sorted_files)} foto(s) em {len(lotes)} lote(s) paralelo(s) "
+                    f"com o modelo {nome_modelo_ativo}..."
+                )
 
-                    if sucesso:
-                        break
+                def _atualizar_status(msg):
+                    texto_status.info(msg)
 
-                    if ciclo < MAX_CICLOS - 1:
-                        espera = 65
-                        texto_status.warning(f"⚠️ Todas as {total_chaves} chaves atingiram o limite por minuto. Aguardando {espera}s para recarregar cotas... (Ciclo {ciclo + 1}/{MAX_CICLOS})")
-                        time.sleep(espera)
-
-                if not sucesso:
-                    raise RuntimeError(
-                        f"Limite de cota excedido em todas as {total_chaves} chaves após {MAX_CICLOS} ciclos. "
-                        "Aguarde alguns minutos e tente novamente."
+                try:
+                    respostas_texto = processar_lotes_em_paralelo(
+                        lotes=lotes,
+                        lista_chaves=lista_chaves,
+                        nome_modelo=nome_modelo_ativo,
+                        prompt_instrucoes=prompt_instrucoes,
+                        max_ciclos=MAX_CICLOS,
+                        callback_status=_atualizar_status,
                     )
+                except RuntimeError as e:
+                    # Se o modelo cacheado parou de funcionar por algum motivo
+                    # que não seja cota, força uma nova resolução na próxima
+                    # tentativa do usuário.
+                    st.session_state.pop("modelo_gemini_ativo", None)
+                    raise RuntimeError(f"{e} Aguarde alguns minutos e tente novamente.")
+
+                sucesso = True
+                # Avança o índice de chave "preferida" para a próxima geração
+                st.session_state.indice_chave_atual = (st.session_state.indice_chave_atual + len(lotes)) % total_chaves
 
                 pneus_estruturados = None
                 erro_parse = None
+                erros_lotes = []
                 try:
-                    pneus_ia = extrair_json_da_resposta(resposta_ia.text)
                     tabela_df = st.session_state.dados_relatorio
                     pneus_estruturados = []
-                    
+                    pneus_ia = []
+
+                    # Cada lote gera seu próprio pedaço de JSON — juntamos tudo
+                    # numa lista só, sinalizando qualquer lote que não tenha
+                    # vindo em formato válido (sem descartar os demais).
+                    for idx_lote, texto_resposta in enumerate(respostas_texto):
+                        try:
+                            pneus_ia.extend(extrair_json_da_resposta(texto_resposta))
+                        except Exception as e:
+                            erros_lotes.append(f"Lote {idx_lote + 1}: {e}")
+
                     for item in pneus_ia:
                         fogo_lido = str(item.get("fogo", "")).strip()
                         dados_tabela = buscar_dados_relatorio(fogo_lido, tabela_df)
@@ -431,19 +451,24 @@ FORMATO DE RESPOSTA (somente um JSON Array válido, sem formatação markdown):
                 except Exception as e:
                     erro_parse = str(e)
 
+                if erros_lotes:
+                    erro_parse = "; ".join(erros_lotes) if not erro_parse else f"{erro_parse}; " + "; ".join(erros_lotes)
+
                 if erro_parse:
                     st.error(f"Erro parse: {erro_parse}")
-                        
+
                 st.session_state.inspection_results = [{
                     "Timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "Modelo_Usado": nome_modelo_ativo,
-                    "Analise_IA_Bruta": resposta_ia.text,
+                    "Analise_IA_Bruta": "\n\n---\n\n".join(respostas_texto),
                     "Pneus": pneus_estruturados,
                     "Erro_Parse": erro_parse,
                     "Imagens": sorted_files
                 }]
 
-                texto_status.success("✅ Inspeção e cruzamento de dados concluídos com sucesso!")
+                texto_status.success(
+                    f"✅ Inspeção e cruzamento de dados concluídos com sucesso! ({len(lotes)} lote(s) processado(s) em paralelo)"
+                )
 
             except Exception as e:
                 st.error(f"Erro no processamento: {str(e)}")
