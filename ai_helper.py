@@ -6,6 +6,11 @@ import difflib
 import concurrent.futures
 from PIL import Image
 
+# Tempo máximo (segundos) que uma chamada individual ao Gemini pode levar
+# antes de ser considerada travada e cancelada com erro. Sem isso, uma
+# conexão presa (comum em alguns ambientes de hospedagem) trava para sempre.
+TIMEOUT_SEGUNDOS = 120
+
 
 def comprimir_imagem(file_bytes, max_dim=1024, qualidade=80):
     img = Image.open(io.BytesIO(file_bytes))
@@ -146,7 +151,12 @@ def _chamar_gemini_processo(api_key, nome_modelo, arquivos_batch, prompt_instruc
     """
     import google.generativeai as genai_proc
 
-    genai_proc.configure(api_key=api_key)
+    # transport="rest" em vez do gRPC padrão: em vários ambientes de
+    # hospedagem (ex: Streamlit Community Cloud), conexões gRPC ficam
+    # travadas silenciosamente (sem erro, sem timeout) quando a rede/proxy
+    # do host não lida bem com HTTP/2 de longa duração. REST falha rápido
+    # com uma mensagem de erro clara em vez de travar para sempre.
+    genai_proc.configure(api_key=api_key, transport="rest")
     model = genai_proc.GenerativeModel(nome_modelo)
 
     conteudo = []
@@ -155,7 +165,12 @@ def _chamar_gemini_processo(api_key, nome_modelo, arquivos_batch, prompt_instruc
         conteudo.append({"mime_type": "image/jpeg", "data": dados})
     conteudo.append(prompt_instrucoes)
 
-    resposta = model.generate_content(conteudo)
+    # timeout explícito: sem isso, uma conexão travada faz a chamada nunca
+    # retornar. Com o timeout, ela levanta uma exceção clara depois de
+    # TIMEOUT_SEGUNDOS, que o chamador pode tratar/reportar.
+    resposta = model.generate_content(
+        conteudo, request_options={"timeout": TIMEOUT_SEGUNDOS}
+    )
     return resposta.text
 
 
@@ -195,8 +210,25 @@ def processar_lotes_em_paralelo(lotes, lista_chaves, nome_modelo, prompt_instruc
                 futuros[fut] = i
 
             novos_pendentes = []
-            for fut in concurrent.futures.as_completed(futuros):
+            try:
+                concluidos = concurrent.futures.wait(
+                    futuros.keys(), timeout=TIMEOUT_SEGUNDOS + 30
+                ).done
+            except Exception:
+                concluidos = []
+
+            for fut in futuros:
                 i = futuros[fut]
+                if fut not in concluidos:
+                    # Processo não terminou nem com a folga extra de 30s
+                    # acima do timeout interno da chamada — trata como falha
+                    # deste lote (não deixa o app girando para sempre).
+                    fut.cancel()
+                    indice_chave[i] = (indice_chave[i] + 1) % total_chaves
+                    novos_pendentes.append(i)
+                    if callback_status:
+                        callback_status(f"⚠️ Lote {i + 1} travou/expirou. Tentando de novo...")
+                    continue
                 try:
                     resultados[i] = fut.result()
                     if callback_status:
